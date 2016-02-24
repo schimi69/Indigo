@@ -252,12 +252,11 @@ void MoleculeAutoLoader::_loadMolecule (BaseMolecule &mol, bool query)
 
          if (!strncmp(prefix, "InChI=", 6)) {
             if (query) {
-               //FAIL
+               throw Error("InChI input doesn't support query molecules");
             }
 
             Array<char> inchi;
             _scanner->readWord(inchi, " ");
-            printf("%s\n", inchi.ptr());
 
             InchiWrapper loader;
             loader.loadMoleculeFromInchi(inchi.ptr(), (Molecule &)mol);
