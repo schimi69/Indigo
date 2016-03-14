@@ -617,15 +617,27 @@ void MoleculeRenderInternal::_initDataSGroups()
          ti.text.push(0);
          ti.fontsize = FONT_SIZE_DATA_SGROUP;
          _cw.setTextItemSize(ti);
-         const AtomDesc& ad = _ad(group.atoms[0]);
+
          if (!group.detached) {
-            ti.bbp.copy(_ad(group.atoms[0]).pos);
-            ti.bbp.x += ad.boundBoxMax.x + _settings.unit * 2;
-            ti.bbp.y -= ti.bbsz.y/2;
-         } else if (group.relative) {
+            if (group.atoms.size() > 0) {
+               const AtomDesc& ad = _ad(group.atoms[0]);
+               ti.bbp.copy(_ad(group.atoms[0]).pos);
+               ti.bbp.x += ad.boundBoxMax.x + _settings.unit * 2;
+               ti.bbp.y -= ti.bbsz.y / 2;
+            }
+         }
+         else if (group.relative) {
+            int parent_idx = group.parent_group;
+            if (parent_idx != 0) {
+               SGroup &parent_group = bm.sgroups.getSGroup(parent_idx - 1);
+            }
+
             _objDistTransform(ti.bbp, group.display_pos);
-            ti.bbp.add(_ad(group.atoms[0]).pos);
-         } else {
+            if (group.atoms.size() > 0) {
+               ti.bbp.add(_ad(group.atoms[0]).pos);
+            }
+         }
+         else {
             _objCoordTransform(ti.bbp, group.display_pos);
          }
       }
