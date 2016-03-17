@@ -111,6 +111,7 @@ private:
    int _findClosestCircle (Vec2f& p, int aid, float radius, int skip = -1);
    int _findClosestBox (Vec2f& p, int aid, const Vec2f& sz, float mrg, int skip = -1);
    void _preparePseudoAtom (int aid, int color, bool highlighted);
+   void _prepareChargeLabel(int aid, int color, bool highlighted);
    void _prepareLabelText (int aid);
    void _prepareAAM ();
    int _pushTextItem (RenderItem::TYPE type, int color, bool highlighted);

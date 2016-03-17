@@ -2655,7 +2655,7 @@ void MoleculeRenderInternal::_preparePseudoAtom (int aid, int color, bool highli
    _cw.setTextItemSize(fake, ad.pos);
    float xpos = fake.bbp.x,
       width = fake.bbsz.x,
-      offset = _settings.unit/2,
+      offset = _settings.unit / 2,
       totalwdt = 0,
       upshift = -0.6f,
       downshift = 0.2f,
@@ -2677,45 +2677,49 @@ void MoleculeRenderInternal::_preparePseudoAtom (int aid, int color, bool highli
       totalwdt += item.bbsz.x;
    } else {
       for (int i = 0; i <= len; ++i) {
-         a = b;
          i1 = i;
-         bool tag = false;
-         char c = (i == len ? ' ' : str[i]);
-         if (isspace(c))
-            b = WHITESPACE;
-         else if (isdigit(c))
-            b = DIGIT;
-         else if (c == '+' || c == '-')
-            b = SIGN, signType = ((c == '+') ? GraphItem::PLUS : GraphItem::MINUS);
-         else if (c == '\\' && i < len - 1 && str[i+1] == 'S')
-            b = TAG_SUPERSCRIPT, ++i, tag = true;
-         else if (c == '\\' && i < len - 1 && str[i+1] == 's')
-            b = TAG_SUBSCRIPT, ++i, tag = true;
-         else if (c == '\\' && i < len - 1 && str[i+1] == 'n')
-            b = TAG_NORMAL, ++i, tag = true;
-         else
-            b = LETTER;
+         a = b;
 
-         bool aTag = a == TAG_SUPERSCRIPT || a == TAG_SUBSCRIPT || a == TAG_NORMAL;
-         if (b == TAG_SUPERSCRIPT) {
-            newscript = SUPER;
-         } else if (b == TAG_SUBSCRIPT) {
-            newscript = SUB;
-         } else if (b == TAG_NORMAL) {
-            newscript = MAIN;
-         } else if ((b == WHITESPACE && a != WHITESPACE) || (b != WHITESPACE && a == WHITESPACE) || (b == LETTER && !aTag)) {
-            newscript = MAIN;
-         } else if (b == DIGIT && a == SIGN) {
-            newscript = script;
-         } else if (b == DIGIT && a != DIGIT && !aTag) {
-            newscript = ((a == LETTER) ? SUB : MAIN);
-         } else if (b == SIGN) {
-            if (a == LETTER || a == DIGIT)
-               newscript = SUPER;
-         } else if (a == SIGN && script == SUPER) {
-            newscript = MAIN;
-         } else {
-            continue;
+         bool tag = false;
+         { char c = (i == len ? ' ' : str[i]);
+           if (isspace(c)) {
+              b = WHITESPACE;
+           } else if (isdigit(c)) {
+              b = DIGIT;
+           } else if (c == '+' || c == '-') {
+              b = SIGN, signType = ((c == '+') ? GraphItem::PLUS : GraphItem::MINUS);
+           } else if (c == '\\' && i < len - 1 && str[i + 1] == 'S') {
+              b = TAG_SUPERSCRIPT, ++i, tag = true;
+           } else if (c == '\\' && i < len - 1 && str[i + 1] == 's') {
+              b = TAG_SUBSCRIPT, ++i, tag = true;
+           } else if (c == '\\' && i < len - 1 && str[i + 1] == 'n') {
+              b = TAG_NORMAL, ++i, tag = true;
+           } else {
+              b = LETTER;
+           } }
+
+         { bool aTag = a == TAG_SUPERSCRIPT || a == TAG_SUBSCRIPT || a == TAG_NORMAL;
+           if (b == TAG_SUPERSCRIPT) {
+              newscript = SUPER;
+           } else if (b == TAG_SUBSCRIPT) {
+              newscript = SUB;
+           } else if (b == TAG_NORMAL) {
+              newscript = MAIN;
+           } else if ((b == WHITESPACE && a != WHITESPACE) || (b != WHITESPACE && a == WHITESPACE) || (b == LETTER && !aTag)) {
+              newscript = MAIN;
+           } else if (b == DIGIT && a == SIGN) {
+              newscript = script;
+           } else if (b == DIGIT && a != DIGIT && !aTag) {
+              newscript = ((a == LETTER) ? SUB : MAIN);
+           } else if (b == SIGN) {
+              if (a == LETTER || a == DIGIT) {
+                 newscript = SUPER;
+              }
+           } else if (a == SIGN && script == SUPER) {
+              newscript = MAIN;
+           } else {
+              continue;
+           }
          }
 
          if (i1 > i0) {
@@ -2765,6 +2769,38 @@ void MoleculeRenderInternal::_preparePseudoAtom (int aid, int color, bool highli
    }
 }
 
+void MoleculeRenderInternal::_prepareChargeLabel (int aid, int color, bool highlighted) {
+   AtomDesc& ad = _ad(aid);
+   BaseMolecule& bm = *_mol;
+
+   int charge = bm.getAtomCharge(aid);
+   if (charge != CHARGE_UNKNOWN && charge != 0) {
+      ad.rightMargin += _settings.labelInternalOffset;
+      if (abs(charge) != 1) {
+         int tiChargeValue = _pushTextItem(ad, RenderItem::RIT_CHARGEVAL, color, highlighted);
+
+         TextItem& itemChargeValue = _data.textitems[tiChargeValue];
+         itemChargeValue.fontsize = FONT_SIZE_ATTR;
+         bprintf(itemChargeValue.text, "%i", abs(charge));
+         _cw.setTextItemSize(itemChargeValue);
+
+         itemChargeValue.bbp.set(ad.rightMargin, ad.ypos + _settings.upperIndexShift * ad.height);
+         _expandBoundRect(ad, itemChargeValue);
+         ad.rightMargin += itemChargeValue.bbsz.x;
+      }
+
+      GraphItem::TYPE type = charge > 0 ? GraphItem::PLUS : GraphItem::MINUS;
+      int giChargeSign = _pushGraphItem(ad, RenderItem::RIT_CHARGESIGN, color, highlighted);
+
+      GraphItem& itemChargeSign = _data.graphitems[giChargeSign];
+      _cw.setGraphItemSizeSign(itemChargeSign, type);
+
+      itemChargeSign.bbp.set(ad.rightMargin, ad.ypos + _settings.upperIndexShift * ad.height);
+      _expandBoundRect(ad, itemChargeSign);
+      ad.rightMargin += itemChargeSign.bbsz.x;
+   }
+}
+
 void MoleculeRenderInternal::_prepareLabelText (int aid)
 {
    AtomDesc& ad = _ad(aid);
@@ -2782,6 +2818,18 @@ void MoleculeRenderInternal::_prepareLabelText (int aid)
 
    if (ad.type == AtomDesc::TYPE_PSEUDO) {
       _preparePseudoAtom(aid, CWC_BASE, highlighted);
+
+      bool chargeSignAdded = false;
+      for (auto i = 0; i < _data.graphitems.size(); i++) {
+         if (_data.graphitems[i].ritype == RenderItem::RIT_CHARGESIGN) {
+            chargeSignAdded = true;
+            break;
+         }
+      }
+
+      if (!chargeSignAdded) {
+         _prepareChargeLabel(aid, color, highlighted);
+      }
    } else if (ad.showLabel) {
       tilabel = _pushTextItem(ad, RenderItem::RIT_LABEL, color, highlighted);
       {
@@ -2946,33 +2994,7 @@ void MoleculeRenderInternal::_prepareLabelText (int aid)
       }
 
       // charge
-      int charge = bm.getAtomCharge(aid);
-      if (charge != CHARGE_UNKNOWN && charge != 0) {
-         ad.rightMargin += _settings.labelInternalOffset;
-         if (abs(charge) != 1)
-         {
-            tiChargeValue = _pushTextItem(ad, RenderItem::RIT_CHARGEVAL, color, highlighted);
-
-            TextItem& itemChargeValue = _data.textitems[tiChargeValue];
-            itemChargeValue.fontsize = FONT_SIZE_ATTR;
-            bprintf(itemChargeValue.text, "%i", abs(charge));
-            _cw.setTextItemSize(itemChargeValue);
-
-            itemChargeValue.bbp.set(ad.rightMargin, ad.ypos + _settings.upperIndexShift * ad.height);
-            _expandBoundRect(ad, itemChargeValue);
-            ad.rightMargin += itemChargeValue.bbsz.x;
-         }
-
-         GraphItem::TYPE type = charge > 0 ? GraphItem::PLUS : GraphItem::MINUS;
-         giChargeSign = _pushGraphItem(ad, RenderItem::RIT_CHARGESIGN, color, highlighted);
-
-         GraphItem& itemChargeSign = _data.graphitems[giChargeSign];
-         _cw.setGraphItemSizeSign(itemChargeSign, type);
-
-         itemChargeSign.bbp.set(ad.rightMargin, ad.ypos + _settings.upperIndexShift * ad.height);
-         _expandBoundRect(ad, itemChargeSign);
-         ad.rightMargin += itemChargeSign.bbsz.x;
-      }
+      _prepareChargeLabel(aid, color, highlighted);
 
       // valence
       int valence = bm.getExplicitValence(aid);
