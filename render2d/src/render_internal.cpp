@@ -20,6 +20,7 @@
 #include "reaction/query_reaction.h"
 #include "render_context.h"
 #include "render_internal.h"
+#include "base_cpp/queue.h"
 
 using namespace indigo;
 
@@ -190,7 +191,8 @@ IMPL_ERROR(MoleculeRenderInternal, "molecule render internal");
 CP_DEF(MoleculeRenderInternal);
 
 MoleculeRenderInternal::MoleculeRenderInternal (const RenderOptions& opt, const RenderSettings& settings, RenderContext& cw) :
-_mol(NULL), _cw(cw), _settings(settings), _opt(opt), CP_INIT, TL_CP_GET(_data), TL_CP_GET(_atomMapping), TL_CP_GET(_atomMappingInv), TL_CP_GET(_bondMappingInv), isRFragment(false)
+_mol(NULL), _cw(cw), _settings(settings), _opt(opt), CP_INIT, TL_CP_GET(_data), TL_CP_GET(_atomMapping), TL_CP_GET(_atomMappingInv), TL_CP_GET(_bondMappingInv),
+isRFragment(false)
 {
    _data.clear();
    _atomMapping.clear();
@@ -287,13 +289,7 @@ void MoleculeRenderInternal::render ()
 
    _prepareLabels();
 
-   _initDataSGroups();
-
-   _initSruGroups();
-
-   _initMulGroups();
-
-   _initSupGroups();
+   _initSGroups();
 
    _extendRenderItems();
 
@@ -553,16 +549,7 @@ const char* MoleculeRenderInternal::_getStereoGroupText (int type)
    }
 }
 
-void MoleculeRenderInternal::_initRGroups()
-{
-   if (_mol->attachmentPointCount() > 0) {
-      for (int i = 1; i <= _mol->attachmentPointCount(); ++i)
-         for (int j = 0, k; (k = _mol->getAttachmentPoint(i, j)) >= 0; ++j)
-            _ad(k).isRGroupAttachmentPoint = true;
-   }
-}
-
-int MoleculeRenderInternal::_parseColorString (Scanner& scanner, float& r, float& g, float& b)
+int MoleculeRenderInternal::_parseColorString(Scanner& scanner, float& r, float& g, float& b)
 {
    if (!scanner.tryReadFloat(r))
       return -1;
@@ -585,17 +572,42 @@ int MoleculeRenderInternal::_parseColorString (Scanner& scanner, float& r, float
    return 1;
 }
 
-void MoleculeRenderInternal::_initDataSGroups()
+void MoleculeRenderInternal::_initRGroups()
+{
+   if (_mol->attachmentPointCount() > 0) {
+      for (int i = 1; i <= _mol->attachmentPointCount(); ++i)
+         for (int j = 0, k; (k = _mol->getAttachmentPoint(i, j)) >= 0; ++j)
+            _ad(k).isRGroupAttachmentPoint = true;
+   }
+}
+
+void MoleculeRenderInternal::_initSGroups()
 {
    BaseMolecule& bm = *_mol;
-   const char* atomColorProp = _opt.atomColorProp.size() > 0 ? _opt.atomColorProp.ptr() : NULL;
 
-   for (int i = bm.sgroups.begin(); i != bm.sgroups.end(); i = bm.sgroups.next(i))
-   {
-      SGroup &sgroup = bm.sgroups.getSGroup(i);
-      if (sgroup.sgroup_type == SGroup::SG_TYPE_DAT)
-      {
+   Queue<int>   queue;
+   Array<bool>  resolved;
+   Array<Vec2f> sgroupsCenters;
+   resolved.resize(bm.sgroups.end());
+   sgroupsCenters.resize(bm.sgroups.end());
+   queue.setLength(1 + bm.sgroups.getSGroupCount());
+   for (int i = bm.sgroups.begin(); i != bm.sgroups.end(); i = bm.sgroups.next(i)) {
+      resolved[i] = false;
+      queue.push(i);
+   }
+
+   while (!queue.isEmpty()) {
+      int current = queue.pop();
+      SGroup &sgroup = bm.sgroups.getSGroup(current);
+      int parent = sgroup.parent_group - 1;
+      if (parent != -1 && !resolved[parent]) {
+         queue.push(current);
+         continue;
+      }
+
+      if (sgroup.sgroup_type == SGroup::SG_TYPE_DAT) {
          const DataSGroup& group = (DataSGroup &)sgroup;
+         const char* atomColorProp = _opt.atomColorProp.size() > 0 ? _opt.atomColorProp.ptr() : NULL;
          if (atomColorProp != NULL && strcmp(atomColorProp, group.name.ptr()) == 0) {
             Vec3f color;
             BufferScanner scanner(group.data);
@@ -625,22 +637,70 @@ void MoleculeRenderInternal::_initDataSGroups()
                ti.bbp.x += ad.boundBoxMax.x + _settings.unit * 2;
                ti.bbp.y -= ti.bbsz.y / 2;
             }
-         }
-         else if (group.relative) {
-            int parent_idx = group.parent_group;
-            if (parent_idx != 0) {
-               SGroup &parent_group = bm.sgroups.getSGroup(parent_idx - 1);
+         } else if (group.relative) {
+            if (parent != -1) {
+               ti.bbp = sgroupsCenters[parent];
+            } else {
+               _objDistTransform(ti.bbp, group.display_pos);
+               if (group.atoms.size() > 0) {
+                  ti.bbp.add(_ad(group.atoms[0]).pos);
+               }
             }
-
-            _objDistTransform(ti.bbp, group.display_pos);
-            if (group.atoms.size() > 0) {
-               ti.bbp.add(_ad(group.atoms[0]).pos);
-            }
-         }
-         else {
+         } else {
             _objCoordTransform(ti.bbp, group.display_pos);
          }
+         sgroupsCenters[current] = ti.bbp;
       }
+
+      if (sgroup.sgroup_type == SGroup::SG_TYPE_SRU) {
+         const RepeatingUnit& group = (RepeatingUnit &)sgroup;
+         Sgroup& sg = _data.sgroups.push();
+         _loadBracketsAuto(group, sg);
+         int tiIndex = _pushTextItem(sg, RenderItem::RIT_SGROUP);
+         TextItem& index = _data.textitems[tiIndex];
+         index.fontsize = FONT_SIZE_ATTR;
+         bprintf(index.text, group.subscript.size() > 0 ? group.subscript.ptr() : "n");
+         _positionIndex(sg, tiIndex, true);
+         sgroupsCenters[current] = index.bbp;
+         if (group.connectivity != RepeatingUnit::HEAD_TO_TAIL) {
+            int tiConn = _pushTextItem(sg, RenderItem::RIT_SGROUP);
+            TextItem& conn = _data.textitems[tiConn];
+            conn.fontsize = FONT_SIZE_ATTR;
+            if (group.connectivity == RepeatingUnit::HEAD_TO_HEAD) {
+               bprintf(conn.text, "hh");
+            } else {
+               bprintf(conn.text, "eu");
+            }
+            _positionIndex(sg, tiConn, false);
+            sgroupsCenters[current] = conn.bbp;
+         }
+      }
+
+      if (sgroup.sgroup_type == SGroup::SG_TYPE_MUL) {
+         const MultipleGroup& group = (MultipleGroup &)sgroup;
+         Sgroup& sg = _data.sgroups.push();
+         _loadBracketsAuto(group, sg);
+         int tiIndex = _pushTextItem(sg, RenderItem::RIT_SGROUP);
+         TextItem& index = _data.textitems[tiIndex];
+         index.fontsize = FONT_SIZE_ATTR;
+         bprintf(index.text, "%d", group.multiplier);
+         _positionIndex(sg, tiIndex, true);
+         sgroupsCenters[current] = index.bbp;
+      }
+
+      if (sgroup.sgroup_type == SGroup::SG_TYPE_SUP) {
+         const Superatom& group = (Superatom &)sgroup;
+         Sgroup& sg = _data.sgroups.push();
+         _placeBrackets(sg, group.atoms);
+         int tiIndex = _pushTextItem(sg, RenderItem::RIT_SGROUP);
+         TextItem& index = _data.textitems[tiIndex];
+         index.fontsize = FONT_SIZE_ATTR;
+         bprintf(index.text, "%s", group.subscript.ptr());
+         _positionIndex(sg, tiIndex, true);
+         sgroupsCenters[current] = index.bbp;
+      }
+
+      resolved[current] = true;
    }
 }
 
@@ -694,57 +754,6 @@ void MoleculeRenderInternal::_positionIndex(Sgroup& sg, int ti, bool lower)
    index.bbp.addScaled(bracket.d, lower ? -yShift : yShift);
 }
 
-void MoleculeRenderInternal::_initSruGroups()
-{
-   BaseMolecule& bm = *_mol;
-   for (int i = bm.sgroups.begin(); i != bm.sgroups.end(); i = bm.sgroups.next(i))
-   {
-      SGroup &sgroup = bm.sgroups.getSGroup(i);
-      if (sgroup.sgroup_type == SGroup::SG_TYPE_SRU)
-      {
-         const RepeatingUnit& group = (RepeatingUnit &)sgroup;
-         Sgroup& sg = _data.sgroups.push();
-         _loadBracketsAuto(group, sg);
-         int tiIndex = _pushTextItem(sg, RenderItem::RIT_SGROUP);
-         TextItem& index = _data.textitems[tiIndex];
-         index.fontsize = FONT_SIZE_ATTR;
-         bprintf(index.text, group.subscript.size() > 0 ? group.subscript.ptr() : "n");
-         _positionIndex(sg, tiIndex, true);
-         if (group.connectivity != RepeatingUnit::HEAD_TO_TAIL) {
-            int tiConn = _pushTextItem(sg, RenderItem::RIT_SGROUP);
-            TextItem& conn = _data.textitems[tiConn];
-            conn.fontsize = FONT_SIZE_ATTR;
-            if (group.connectivity == RepeatingUnit::HEAD_TO_HEAD) {
-               bprintf(conn.text, "hh");
-            } else {
-               bprintf(conn.text, "eu");
-            }
-            _positionIndex(sg, tiConn, false);
-         }
-      }
-   }
-}
-
-void MoleculeRenderInternal::_initMulGroups()
-{
-   BaseMolecule& bm = *_mol;
-   for (int i = bm.sgroups.begin(); i != bm.sgroups.end(); i = bm.sgroups.next(i))
-   {
-      SGroup &sgroup = bm.sgroups.getSGroup(i);
-      if (sgroup.sgroup_type == SGroup::SG_TYPE_MUL)
-      {
-         const MultipleGroup& group = (MultipleGroup &)sgroup;
-         Sgroup& sg = _data.sgroups.push();
-         _loadBracketsAuto(group, sg);
-         int tiIndex = _pushTextItem(sg, RenderItem::RIT_SGROUP);
-         TextItem& index = _data.textitems[tiIndex];
-         index.fontsize = FONT_SIZE_ATTR;
-         bprintf(index.text, "%d", group.multiplier);
-         _positionIndex(sg, tiIndex, true);
-      }
-   }
-}
-
 void MoleculeRenderInternal::_placeBrackets(Sgroup& sg, const Array<int>& atoms)
 {
    QS_DEF(Array<Vec2f[2]>, brackets);
@@ -773,26 +782,6 @@ void MoleculeRenderInternal::_placeBrackets(Sgroup& sg, const Array<int>& atoms)
    right[0].set(max.x, min.y);
    right[1].set(max.x, max.y);
    _loadBrackets(sg, brackets, false);
-}
-
-void MoleculeRenderInternal::_initSupGroups()
-{
-   BaseMolecule& bm = *_mol;
-   for (int i = bm.sgroups.begin(); i != bm.sgroups.end(); i = bm.sgroups.next(i))
-   {
-      SGroup &sgroup = bm.sgroups.getSGroup(i);
-      if (sgroup.sgroup_type == SGroup::SG_TYPE_SUP)
-      {
-         const Superatom& group = (Superatom &)sgroup;
-         Sgroup& sg = _data.sgroups.push();
-         _placeBrackets(sg, group.atoms);
-         int tiIndex = _pushTextItem(sg, RenderItem::RIT_SGROUP);
-         TextItem& index = _data.textitems[tiIndex];
-         index.fontsize = FONT_SIZE_ATTR;
-         bprintf(index.text, "%s", group.subscript.ptr());
-         _positionIndex(sg, tiIndex, true);
-      }
-   }
 }
 
 void MoleculeRenderInternal::_prepareSGroups()

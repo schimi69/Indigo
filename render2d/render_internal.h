@@ -76,10 +76,7 @@ private:
    void _placeBrackets(Sgroup& sg, const Array<int>& atoms);
    void _positionIndex(Sgroup& sg, int ti, bool lower);
    void _loadBracketsAuto(const SGroup& group, Sgroup& sg);
-   void _initDataSGroups();
-   void _initSruGroups();
-   void _initMulGroups();
-   void _initSupGroups();
+   void _initSGroups();
    void _prepareSGroups();
    void _findAnglesOverPi();
    void _renderBondIds();
