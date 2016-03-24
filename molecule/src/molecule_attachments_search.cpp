@@ -12,6 +12,7 @@
 * WARRANTY OF DESIGN, MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE.
 ***************************************************************************/
 
+#include "assert.h"
 #include "base_cpp/array.h"
 #include "molecule/molecule_attachments_search.h"
 

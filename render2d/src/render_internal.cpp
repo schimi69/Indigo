@@ -12,6 +12,7 @@
  * WARRANTY OF DESIGN, MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE.
  ***************************************************************************/
 
+#include "base_cpp/tree.h"
 #include "base_cpp/output.h"
 #include "base_cpp/scanner.h"
 #include "molecule/molecule.h"
@@ -206,23 +207,23 @@ void MoleculeRenderInternal::setMolecule (BaseMolecule* mol)
    _data.clear();
    _atomMapping.clear();
 
-   if ((_opt.collapseSuperatoms && _mol->sgroups.getSGroupCount(SGroup::SG_TYPE_SUP) > 0) ||
-       _mol->sgroups.getSGroupCount(SGroup::SG_TYPE_MUL) > 0) {
+   bool superatoms = _mol->sgroups.getSGroupCount(SGroup::SG_TYPE_SUP) > 0;
+   bool mulsgroups = _mol->sgroups.getSGroupCount(SGroup::SG_TYPE_MUL) > 0;
+   if (mulsgroups || _opt.collapseSuperatoms && superatoms) {
       _prepareSGroups();
    }
 
-   int i;
-
-   // data
    _data.atoms.clear();
    _data.atoms.resize(_mol->vertexEnd());
-   for (i = _mol->vertexBegin(); i != _mol->vertexEnd(); i = _mol->vertexNext(i))
+   for (auto i = _mol->vertexBegin(); i != _mol->vertexEnd(); i = _mol->vertexNext(i)) {
       _ad(i).clear();
+   }
 
    _data.bonds.clear();
    _data.bonds.resize(_mol->edgeEnd());
-   for (i = _mol->edgeBegin(); i != _mol->edgeEnd(); i = _mol->edgeNext(i))
+   for (auto i = _mol->edgeBegin(); i != _mol->edgeEnd(); i = _mol->edgeNext(i)) {
       _bd(i).clear();
+   }
 }
 
 void MoleculeRenderInternal::setIsRFragment (bool isRFragment)
@@ -581,29 +582,11 @@ void MoleculeRenderInternal::_initRGroups()
    }
 }
 
-void MoleculeRenderInternal::_initSGroups()
-{
-   BaseMolecule& bm = *_mol;
+void MoleculeRenderInternal::_initSGroups(Tree& sgroups, Vec2f parentInfo) {
+   BaseMolecule &mol = *_mol;
 
-   Queue<int>   queue;
-   Array<bool>  resolved;
-   Array<Vec2f> sgroupsCenters;
-   resolved.resize(bm.sgroups.end());
-   sgroupsCenters.resize(bm.sgroups.end());
-   queue.setLength(1 + bm.sgroups.getSGroupCount());
-   for (int i = bm.sgroups.begin(); i != bm.sgroups.end(); i = bm.sgroups.next(i)) {
-      resolved[i] = false;
-      queue.push(i);
-   }
-
-   while (!queue.isEmpty()) {
-      int current = queue.pop();
-      SGroup &sgroup = bm.sgroups.getSGroup(current);
-      int parent = sgroup.parent_group - 1;
-      if (parent != -1 && !resolved[parent]) {
-         queue.push(current);
-         continue;
-      }
+   if (sgroups.label != -1) {
+      SGroup& sgroup = mol.sgroups.getSGroup(sgroups.label);
 
       if (sgroup.sgroup_type == SGroup::SG_TYPE_DAT) {
          const DataSGroup& group = (DataSGroup &)sgroup;
@@ -620,7 +603,7 @@ void MoleculeRenderInternal::_initSGroups()
                ad.hcolor.copy(color);
                ad.hcolorSet = true;
             }
-            continue;
+            return;
          }
          Sgroup& sg = _data.sgroups.push();
          int tii = _pushTextItem(sg, RenderItem::RIT_DATASGROUP);
@@ -638,18 +621,19 @@ void MoleculeRenderInternal::_initSGroups()
                ti.bbp.y -= ti.bbsz.y / 2;
             }
          } else if (group.relative) {
-            if (parent != -1) {
-               ti.bbp = sgroupsCenters[parent];
-            } else {
-               _objDistTransform(ti.bbp, group.display_pos);
+            _objDistTransform(ti.bbp, group.display_pos);
+            if (_isIllegal(parentInfo)) {
                if (group.atoms.size() > 0) {
                   ti.bbp.add(_ad(group.atoms[0]).pos);
                }
+            } else {
+               ti.bbp = parentInfo;
             }
          } else {
             _objCoordTransform(ti.bbp, group.display_pos);
          }
-         sgroupsCenters[current] = ti.bbp;
+
+         parentInfo = ti.bbp;
       }
 
       if (sgroup.sgroup_type == SGroup::SG_TYPE_SRU) {
@@ -661,7 +645,6 @@ void MoleculeRenderInternal::_initSGroups()
          index.fontsize = FONT_SIZE_ATTR;
          bprintf(index.text, group.subscript.size() > 0 ? group.subscript.ptr() : "n");
          _positionIndex(sg, tiIndex, true);
-         sgroupsCenters[current] = index.bbp;
          if (group.connectivity != RepeatingUnit::HEAD_TO_TAIL) {
             int tiConn = _pushTextItem(sg, RenderItem::RIT_SGROUP);
             TextItem& conn = _data.textitems[tiConn];
@@ -672,8 +655,10 @@ void MoleculeRenderInternal::_initSGroups()
                bprintf(conn.text, "eu");
             }
             _positionIndex(sg, tiConn, false);
-            sgroupsCenters[current] = conn.bbp;
          }
+
+         Rect2f bound = _bound(sgroup.atoms);
+         parentInfo = bound.leftTop();
       }
 
       if (sgroup.sgroup_type == SGroup::SG_TYPE_MUL) {
@@ -685,7 +670,8 @@ void MoleculeRenderInternal::_initSGroups()
          index.fontsize = FONT_SIZE_ATTR;
          bprintf(index.text, "%d", group.multiplier);
          _positionIndex(sg, tiIndex, true);
-         sgroupsCenters[current] = index.bbp;
+
+         parentInfo = index.bbp;
       }
 
       if (sgroup.sgroup_type == SGroup::SG_TYPE_SUP) {
@@ -697,11 +683,28 @@ void MoleculeRenderInternal::_initSGroups()
          index.fontsize = FONT_SIZE_ATTR;
          bprintf(index.text, "%s", group.subscript.ptr());
          _positionIndex(sg, tiIndex, true);
-         sgroupsCenters[current] = index.bbp;
-      }
 
-      resolved[current] = true;
+         parentInfo = index.bbp;
+      }
    }
+
+   ObjArray<Tree>& children = sgroups.children();
+   for (int i = 0; i < children.size(); i++) {
+      _initSGroups(children[i], parentInfo);
+   }
+}
+
+void MoleculeRenderInternal::_initSGroups()
+{
+   BaseMolecule& mol = *_mol;
+
+   Tree sgroups;
+   for (auto i = mol.sgroups.begin(); i != mol.sgroups.end(); i = mol.sgroups.next(i)) {
+      SGroup &sgroup = mol.sgroups.getSGroup(i);
+      sgroups.insert(i, sgroup.parent_group - 1);
+   }
+
+   _initSGroups(sgroups, ILLEGAL_POINT);
 }
 
 void MoleculeRenderInternal::_loadBrackets(Sgroup& sg, const Array<Vec2f[2]>& coord, bool transformCoordinates)
@@ -709,18 +712,17 @@ void MoleculeRenderInternal::_loadBrackets(Sgroup& sg, const Array<Vec2f[2]>& co
    for (int j = 0; j < coord.size(); ++j) {
       Vec2f a(coord[j][0]), b(coord[j][1]);
       int bracketId = _data.brackets.size();
-      if (j == 0)
+      if (j == 0) {
          sg.bibegin = bracketId, sg.bicount = 1;
-      else
+      } else {
          sg.bicount++;
-      RenderItemBracket& bracket =_data.brackets.push();
+      }
+      RenderItemBracket& bracket = _data.brackets.push();
       bracket.p0.copy(a);
       bracket.p1.copy(b);
       if (transformCoordinates) {
-         bracket.p0.set(a.x - _min.x, _max.y - a.y);
-         bracket.p0.scale(_scale);
-         bracket.p1.set(b.x - _min.x, _max.y - b.y);
-         bracket.p1.scale(_scale);
+         _objCoordTransform(bracket.p0, a);
+         _objCoordTransform(bracket.p1, b);
       }
       bracket.d.diff(bracket.p1, bracket.p0);
       bracket.length = bracket.d.length();
@@ -735,10 +737,11 @@ void MoleculeRenderInternal::_loadBrackets(Sgroup& sg, const Array<Vec2f[2]>& co
 }
 
 void MoleculeRenderInternal::_loadBracketsAuto(const SGroup& group, Sgroup& sg) {
-   if (group.brackets.size() == 0 || Vec2f::distSqr(group.brackets.at(0)[0], group.brackets.at(0)[1]) < EPSILON)
+   if (group.brackets.size() == 0 || Vec2f::distSqr(group.brackets.at(0)[0], group.brackets.at(0)[1]) < EPSILON) {
       _placeBrackets(sg, group.atoms);
-   else
+   } else {
       _loadBrackets(sg, group.brackets, true);
+   }
 }
 
 void MoleculeRenderInternal::_positionIndex(Sgroup& sg, int ti, bool lower)
@@ -784,44 +787,43 @@ void MoleculeRenderInternal::_placeBrackets(Sgroup& sg, const Array<int>& atoms)
    _loadBrackets(sg, brackets, false);
 }
 
+void MoleculeRenderInternal::_cloneAndFillMappings() {
+   BaseMolecule* clone = _mol->neu();
+   clone->clone(*_mol, &_atomMapping, &_atomMappingInv);
+
+   _bondMappingInv.clear();
+   for (int i = clone->edgeBegin(); i < clone->edgeEnd(); i = clone->edgeNext(i)) {
+      _bondMappingInv.insert(i, BaseMolecule::findMappedEdge(*clone, *_mol, i, _atomMappingInv.ptr()));
+   }
+   _mol = clone;
+}
+
 void MoleculeRenderInternal::_prepareSGroups()
 {
-   {
-      BaseMolecule* newMol = NULL;
-      BaseMolecule& bm1 = *_mol;
-      if (bm1.isQueryMolecule())
-         newMol = new QueryMolecule();
-      else
-         newMol = new Molecule();
-      newMol->clone(bm1, &_atomMapping, &_atomMappingInv);
-      _bondMappingInv.clear();
-      for (int i = newMol->edgeBegin(); i < newMol->edgeEnd(); i = newMol->edgeNext(i))
-         _bondMappingInv.insert(i, BaseMolecule::findMappedEdge(*newMol, *_mol, i, _atomMappingInv.ptr()));
-      _mol = newMol;
-   }
+   _cloneAndFillMappings();
 
-   BaseMolecule& bm = *_mol;
+   BaseMolecule& mol = *_mol;
    if (_opt.collapseSuperatoms) {
-      for (int i = bm.sgroups.begin(); i != bm.sgroups.end(); i = bm.sgroups.next(i))
+      for (int i = mol.sgroups.begin(); i != mol.sgroups.end(); i = mol.sgroups.next(i))
       {
-         SGroup &sgroup = bm.sgroups.getSGroup(i);
+         SGroup &sgroup = mol.sgroups.getSGroup(i);
          if (sgroup.sgroup_type == SGroup::SG_TYPE_SUP)
          {
             const Superatom& group = (Superatom &)sgroup;
             Vec3f centre;
             for (int i = 0; i < group.atoms.size(); ++i) {
                int aid = group.atoms[i];
-               centre.add(bm.getAtomXyz(aid));
+               centre.add(mol.getAtomXyz(aid));
             }
             centre.scale(1.0f / group.atoms.size());
             int said = -1;
    
-            if (bm.isQueryMolecule()) {
+            if (mol.isQueryMolecule()) {
                AutoPtr<QueryMolecule::Atom> atom;
                atom.reset(new QueryMolecule::Atom(QueryMolecule::ATOM_PSEUDO, group.subscript.ptr()));
-               said = bm.asQueryMolecule().addAtom(atom.release());
+               said = mol.asQueryMolecule().addAtom(atom.release());
             } else {
-               Molecule& mol = bm.asMolecule();
+               Molecule& mol = mol.asMolecule();
                said = mol.addAtom(ELEM_PSEUDO);
                mol.setPseudoAtom(said, group.subscript.ptr());
             }
@@ -834,21 +836,21 @@ void MoleculeRenderInternal::_prepareSGroups()
             int posCnt = 0;
             while (group.atoms.size() > 0) {
                int aid = group.atoms[0];
-               const Vertex& v = bm.getVertex(aid);
+               const Vertex& v = mol.getVertex(aid);
                bool posCounted = false;
                for (int j = v.neiBegin(); j < v.neiEnd(); j = v.neiNext(j)) {
                   int naid = v.neiVertex(j);
                   if (!groupAtoms.find(naid)) {
-                     pos.add(bm.getAtomXyz(aid));
+                     pos.add(mol.getAtomXyz(aid));
                      posCounted = true;
                      posCnt++;
                      int nbid = v.neiEdge(j), bid = -1;
-                     if (bm.findEdgeIndex(naid, said) < 0) {
-                        if (bm.isQueryMolecule()) {
-                           QueryMolecule& qm = bm.asQueryMolecule();
+                     if (mol.findEdgeIndex(naid, said) < 0) {
+                        if (mol.isQueryMolecule()) {
+                           QueryMolecule& qm = mol.asQueryMolecule();
                            bid = qm.addBond(said, naid, qm.getBond(nbid).clone());
-                        }else{
-                           Molecule& mol = bm.asMolecule();
+                        } else {
+                           Molecule& mol = mol.asMolecule();
                            bid = mol.addBond(said, naid, mol.getBondOrder(nbid));
                            mol.setEdgeTopology(bid, mol.getBondTopology(nbid));
                         }
@@ -858,25 +860,26 @@ void MoleculeRenderInternal::_prepareSGroups()
                      }
                   }
                }
-               bm.removeAtom(aid);
+               mol.removeAtom(aid);
             }
-            if (posCnt == 0)
+            if (posCnt == 0) {
                pos.copy(centre);
-            else
+            } else {
                pos.scale(1.f / posCnt);
-            bm.setAtomXyz(said, pos.x, pos.y, pos.z);
+            }
+            mol.setAtomXyz(said, pos.x, pos.y, pos.z);
          }
       }
    }
 
    QS_DEF(BaseMolecule::Mapping, mapAtom);
    mapAtom.clear();
-   for (int i = bm.sgroups.begin(); i != bm.sgroups.end(); i = bm.sgroups.next(i))
+   for (int i = mol.sgroups.begin(); i != mol.sgroups.end(); i = mol.sgroups.next(i))
    {
-      SGroup &sgroup = bm.sgroups.getSGroup(i);
+      SGroup &sgroup = mol.sgroups.getSGroup(i);
       if (sgroup.sgroup_type == SGroup::SG_TYPE_MUL)
       {
-         BaseMolecule::collapse(bm, i, mapAtom, _bondMappingInv);
+         BaseMolecule::collapse(mol, i, mapAtom, _bondMappingInv);
       }
    }
 }
@@ -1254,6 +1257,7 @@ void MoleculeRenderInternal::_prepareLabels()
 
 void MoleculeRenderInternal::_objCoordTransform(Vec2f& p, const Vec2f& v) const
 {
+   //shift, mirror of Y axis, scale
    p.set((v.x - _min.x) * _scale, (_max.y - v.y) * _scale);
 }
 
@@ -1543,16 +1547,14 @@ void MoleculeRenderInternal::_initAtomData ()
       {
          ad.type = AtomDesc::TYPE_PSEUDO;
          ad.pseudo.readString(bm.getPseudoAtom(i), true);
-      }
-      else if (bm.isTemplateAtom(i))
-      {
+      } else if (bm.isTemplateAtom(i)) {
          ad.type = AtomDesc::TYPE_PSEUDO;
          ad.pseudo.readString(bm.getTemplateAtom(i), true);
-      }
-      else if (atomNumber < 0 || atomNumber == ELEM_RSITE)
+      } else if (atomNumber < 0 || atomNumber == ELEM_RSITE) {
          ad.type = AtomDesc::TYPE_QUERY;
-      else
+      } else {
          ad.type = AtomDesc::TYPE_REGULAR;
+      }
 
       ad.label = -1;
       if (ad.type == AtomDesc::TYPE_REGULAR)

@@ -16,6 +16,7 @@
 #define __render_internal_h__
 
 #include "render_common.h"
+#include "base_cpp/tree.h"
 
 namespace indigo {
 
@@ -76,8 +77,11 @@ private:
    void _placeBrackets(Sgroup& sg, const Array<int>& atoms);
    void _positionIndex(Sgroup& sg, int ti, bool lower);
    void _loadBracketsAuto(const SGroup& group, Sgroup& sg);
-   void _initSGroups();
+
    void _prepareSGroups();
+   void _initSGroups(Tree& sgroups, Vec2f extra);
+   void _initSGroups();
+
    void _findAnglesOverPi();
    void _renderBondIds();
    void _renderAtomIds();
@@ -136,6 +140,43 @@ private:
    void _bondTriple (BondDescr& bd, const BondEnd& be1, const BondEnd& be2);
    void _bondAny (BondDescr& bd, const BondEnd& be1, const BondEnd& be2);
    int _parseColorString (Scanner& str, float& r, float& g, float& b);
+
+   void _cloneAndFillMappings();
+
+   //TODO: remove dublicate with _placeBrackets(..)
+   inline Rect2f _bound(Array<int>& atoms) const {
+      const int n = atoms.size();
+      Array<Vec2f> points;
+      points.resize(n);
+      for (int i = 0; i < n; i++) {
+         points[i] = _ad(atoms[i]).pos;
+      }
+      return _bound(points, 0, n-1);
+   }
+
+   Rect2f _bound(Array<Vec2f>& points, int l, int r) const {
+      if (r == l || r == l + 1) {
+         return Rect2f(points[l], points[r]);
+      }
+      int m = (l + r) / 2;
+      return Rect2f(
+         _bound(points, l,   m),
+         _bound(points, m+1, r)
+      );
+   }
+
+   inline Vec2f _firstPosition(Array<int>& atoms) {
+      return _ad(atoms[0]).pos;
+   }
+
+   //TODO: move into Vec2f?
+   const Vec2f ILLEGAL_POINT = Vec2f(nanf(""), nanf(""));
+   inline bool _isIllegal(Vec2f point) {
+      return _isNaN(point.x) && _isNaN(point.y);
+   }
+   inline bool _isNaN(float x) {
+      return x != x;
+   }
 
    // local
    void* _hdc;

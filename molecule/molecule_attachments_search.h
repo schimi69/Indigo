@@ -15,7 +15,6 @@
 #ifndef __molecule_attachments_search__
 #define __molecule_attachments_search__
 
-#include "assert.h"
 #include "algorithm"
 
 #include "base_cpp/array.h"
