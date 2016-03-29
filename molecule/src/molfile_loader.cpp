@@ -3136,7 +3136,8 @@ void MolfileLoader::_readSGroup3000 (const char *str)
       }
       else if (strcmp(entity.ptr(), "FIELDDISP") == 0)
       {
-         QS_DEF(Array<char>, substr);
+//         QS_DEF(Array<char>, substr);
+         Array<char> substr;
          _readStringInQuotes(scanner, &substr);
          if (dsg != 0)
          {

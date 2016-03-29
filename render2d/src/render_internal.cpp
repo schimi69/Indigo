@@ -582,11 +582,13 @@ void MoleculeRenderInternal::_initRGroups()
    }
 }
 
-void MoleculeRenderInternal::_initSGroups(Tree& sgroups, Vec2f parentInfo) {
+void MoleculeRenderInternal::_initSGroups(Tree& sgroups, Rect2f parent) {
    BaseMolecule &mol = *_mol;
 
    if (sgroups.label != -1) {
       SGroup& sgroup = mol.sgroups.getSGroup(sgroups.label);
+
+      const Rect2f bound = _bound(sgroup.atoms);
 
       if (sgroup.sgroup_type == SGroup::SG_TYPE_DAT) {
          const DataSGroup& group = (DataSGroup &)sgroup;
@@ -608,8 +610,9 @@ void MoleculeRenderInternal::_initSGroups(Tree& sgroups, Vec2f parentInfo) {
          Sgroup& sg = _data.sgroups.push();
          int tii = _pushTextItem(sg, RenderItem::RIT_DATASGROUP);
          TextItem& ti = _data.textitems[tii];
-         ti.text.copy(group.data);
-         ti.text.push(0);
+         ti.text.push(group.tag);
+         ti.text.appendString(" = ", false);
+         ti.text.appendString(group.data.ptr(), true);
          ti.fontsize = FONT_SIZE_DATA_SGROUP;
          _cw.setTextItemSize(ti);
 
@@ -622,18 +625,18 @@ void MoleculeRenderInternal::_initSGroups(Tree& sgroups, Vec2f parentInfo) {
             }
          } else if (group.relative) {
             _objDistTransform(ti.bbp, group.display_pos);
-            if (_isIllegal(parentInfo)) {
+            if (IS_ILLEGAL(parent)) {
                if (group.atoms.size() > 0) {
                   ti.bbp.add(_ad(group.atoms[0]).pos);
                }
             } else {
-               ti.bbp = parentInfo;
+               ti.bbp.add(parent.rightTop());
             }
          } else {
             _objCoordTransform(ti.bbp, group.display_pos);
          }
 
-         parentInfo = ti.bbp;
+         parent = ILLEGAL_RECT();
       }
 
       if (sgroup.sgroup_type == SGroup::SG_TYPE_SRU) {
@@ -657,8 +660,7 @@ void MoleculeRenderInternal::_initSGroups(Tree& sgroups, Vec2f parentInfo) {
             _positionIndex(sg, tiConn, false);
          }
 
-         Rect2f bound = _bound(sgroup.atoms);
-         parentInfo = bound.leftTop();
+         parent = bound;
       }
 
       if (sgroup.sgroup_type == SGroup::SG_TYPE_MUL) {
@@ -671,7 +673,7 @@ void MoleculeRenderInternal::_initSGroups(Tree& sgroups, Vec2f parentInfo) {
          bprintf(index.text, "%d", group.multiplier);
          _positionIndex(sg, tiIndex, true);
 
-         parentInfo = index.bbp;
+         parent = ILLEGAL_RECT();
       }
 
       if (sgroup.sgroup_type == SGroup::SG_TYPE_SUP) {
@@ -684,13 +686,13 @@ void MoleculeRenderInternal::_initSGroups(Tree& sgroups, Vec2f parentInfo) {
          bprintf(index.text, "%s", group.subscript.ptr());
          _positionIndex(sg, tiIndex, true);
 
-         parentInfo = index.bbp;
+         parent = ILLEGAL_RECT();
       }
    }
 
    ObjArray<Tree>& children = sgroups.children();
    for (int i = 0; i < children.size(); i++) {
-      _initSGroups(children[i], parentInfo);
+      _initSGroups(children[i], parent);
    }
 }
 
@@ -704,7 +706,7 @@ void MoleculeRenderInternal::_initSGroups()
       sgroups.insert(i, sgroup.parent_group - 1);
    }
 
-   _initSGroups(sgroups, ILLEGAL_POINT);
+   _initSGroups(sgroups, Rect2f(_min, _max));
 }
 
 void MoleculeRenderInternal::_loadBrackets(Sgroup& sg, const Array<Vec2f[2]>& coord, bool transformCoordinates)

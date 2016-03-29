@@ -79,7 +79,7 @@ private:
    void _loadBracketsAuto(const SGroup& group, Sgroup& sg);
 
    void _prepareSGroups();
-   void _initSGroups(Tree& sgroups, Vec2f extra);
+   void _initSGroups(Tree& sgroups, Rect2f parent);
    void _initSGroups();
 
    void _findAnglesOverPi();
@@ -146,6 +146,9 @@ private:
    //TODO: remove dublicate with _placeBrackets(..)
    inline Rect2f _bound(Array<int>& atoms) const {
       const int n = atoms.size();
+      if (n <= 0) {
+         return Rect2f(Vec2f(0, 0), Vec2f(0, 0));
+      }
       Array<Vec2f> points;
       points.resize(n);
       for (int i = 0; i < n; i++) {
@@ -169,13 +172,23 @@ private:
       return _ad(atoms[0]).pos;
    }
 
-   //TODO: move into Vec2f?
-   const Vec2f ILLEGAL_POINT = Vec2f(nanf(""), nanf(""));
-   inline bool _isIllegal(Vec2f point) {
-      return _isNaN(point.x) && _isNaN(point.y);
+   inline static Vec2f  ILLEGAL_POINT() {
+      return Vec2f(nanf(""), nanf(""));
    }
-   inline bool _isNaN(float x) {
+
+   //TODO: eliminate
+   inline static Rect2f ILLEGAL_RECT () {
+      return Rect2f(ILLEGAL_POINT(), ILLEGAL_POINT());
+   }
+
+   inline static bool IS_NAN(float x) {
       return x != x;
+   }
+   inline static bool IS_ILLEGAL(Vec2f point) {
+      return IS_NAN(point.x) && IS_NAN(point.y);
+   }
+   inline static bool IS_ILLEGAL(Rect2f rect) {
+      return IS_ILLEGAL(rect.leftBottom()) && IS_ILLEGAL(rect.rightTop());
    }
 
    // local
