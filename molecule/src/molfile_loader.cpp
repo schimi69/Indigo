@@ -2106,8 +2106,12 @@ void MolfileLoader::_readCtab3000 ()
 
    _scanner.readLine(str, true);
    if (strncmp(str.ptr(), "M  V30 BEGIN ATOM", 14) != 0)
+   {
+      if (_atoms_num > 0)
       throw Error("Error reading ATOM block header");
-
+   }
+   else
+   {
    for (i = 0; i < _atoms_num; i++)
    {
       _readMultiString(str);
@@ -2531,6 +2535,7 @@ void MolfileLoader::_readCtab3000 ()
       throw Error("Error reading ATOM block footer");
 
    _scanner.readLine(str, true);
+   }
    if (strncmp(str.ptr(), "M  V30 BEGIN BOND", 17) != 0)
    {  
       if (_bonds_num > 0)
