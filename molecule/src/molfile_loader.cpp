@@ -1313,6 +1313,7 @@ void MolfileLoader::_readCtab2000 ()
                      id[3] = 0;
                      throw Error("Undefined Sgroup connectivity: '%s'", id);
                   }
+               }
                   if (id[2] == '\n')
                   {
                      if (n != 0)
@@ -1322,7 +1323,6 @@ void MolfileLoader::_readCtab2000 ()
                         need_skip_line = false;
                   }
                }
-            }
             if (need_skip_line)
                _scanner.skipLine();
          }
