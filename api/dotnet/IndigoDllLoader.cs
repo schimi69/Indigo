@@ -359,6 +359,8 @@ namespace com.epam.indigo
                 } else {
                     File.Delete(tmp_filename);
                 }
+            } else {
+                File.Delete(tmp_filename);
             }
             return file.FullName;
         }

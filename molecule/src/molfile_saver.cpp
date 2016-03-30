@@ -363,11 +363,16 @@ void MolfileSaver::_writeCtab (Output &output, BaseMolecule &mol, bool query)
 
    output.writeStringCR("M  V30 BEGIN CTAB");
    output.printfCR("M  V30 COUNTS %d %d %d 0 0", mol.vertexCount(), mol.edgeCount(), mol.countSGroups());
-   output.writeStringCR("M  V30 BEGIN ATOM");
 
    int i;
-   int iw = 1;
+   int iw;
    QS_DEF(Array<char>, buf);
+
+   if (mol.vertexCount() > 0)
+   {
+      output.writeStringCR("M  V30 BEGIN ATOM");
+
+      iw = 1;
 
    _atom_mapping.clear_resize(mol.vertexEnd());
    _bond_mapping.clear_resize(mol.edgeEnd());
@@ -584,6 +589,10 @@ void MolfileSaver::_writeCtab (Output &output, BaseMolecule &mol, bool query)
    }
 
    output.writeStringCR("M  V30 END ATOM");
+   }
+   
+   if (mol.edgeCount() > 0)
+   {
    output.writeStringCR("M  V30 BEGIN BOND");
 
    iw = 1;
@@ -661,6 +670,7 @@ void MolfileSaver::_writeCtab (Output &output, BaseMolecule &mol, bool query)
    }
 
    output.writeStringCR("M  V30 END BOND");
+   }
 
    MoleculeStereocenters &stereocenters = mol.stereocenters;
 
