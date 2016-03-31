@@ -52,9 +52,11 @@ def updateAssemblyVersion(assemblyFile, newAssemblyVersion):
         assemblyText = f.read()
         m1 = p1.search(assemblyText)
         r1 = p1.sub('{0}{1}{2}'.format(m1.group(1), newAssemblyVersion, m1.group(3)), assemblyText)
+        newAssemblyFileVersion = re.sub('\*', '0', newAssemblyVersion) # * is not allowed for AssemblyFileVersion
         m2 = p2.search(r1)
-        r2 = p2.sub('{0}{1}{2}'.format(m2.group(1), newAssemblyVersion, m2.group(3)), r1)
-    print('Updating Indigo version from {0} to {1} in {2}...'.format(m1.group(2), newAssemblyVersion, assemblyFile))
+        r2 = p2.sub('{0}{1}{2}'.format(m2.group(1), newAssemblyFileVersion, m2.group(3)), r1)
+    print('Updating AssemblyVersion from {0} to {1} in {2}...'.format(m1.group(2), newAssemblyVersion, assemblyFile))
+    print('Updating AssemblyFileVersion from {0} to {1} in {2}...'.format(m2.group(2), newAssemblyFileVersion, assemblyFile))
     with open(assemblyFile, 'w') as f:
         f.write(r2)
 
