@@ -9,7 +9,7 @@ INDIGO_PATH = os.path.normpath(os.path.join(os.path.abspath(os.path.dirname(__fi
 
 def getIndigoCMakeVersion():
     with open(os.path.join(INDIGO_PATH, 'api', 'indigo-version.cmake'), 'r') as f:
-        m = re.match('SET\(INDIGO_VERSION \"(.*)\"\).*', f.read())
+        m = re.search('SET\(INDIGO_VERSION \"(.*)\"\).*', f.read())
         return m.group(1)
 
 
@@ -17,7 +17,7 @@ def setIndigoCMakeVersion(newVersion):
     cmakeFile = os.path.join(INDIGO_PATH, 'api', 'indigo-version.cmake')
     with open(cmakeFile, 'r') as f:
         cmakeText = f.read()
-        m = re.match('SET\(INDIGO_VERSION \"(.*)\"\).*', cmakeText)
+        m = re.search('SET\(INDIGO_VERSION \"(.*)\"\).*', cmakeText)
         result = re.sub('SET\(INDIGO_VERSION \"(.*)\"\).*', 'SET(INDIGO_VERSION "{0}")'.format(newVersion), cmakeText)
     print('Updating Indigo version from {0} to {1} in {2}...'.format(m.group(1), newVersion, cmakeFile))
     with open(cmakeFile, 'w') as f:
