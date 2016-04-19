@@ -26,14 +26,14 @@ IMPL_ERROR(MoleculeCmlSaver, "molecule CML saver");
 MoleculeCmlSaver::MoleculeCmlSaver (Output &output) : _output(output)
 {
    skip_cml_tag = false;
-   _doc = new TiXmlDocument();
-   _root = 0;
 }
 
 void MoleculeCmlSaver::saveMolecule (Molecule &mol)
 {
    LocaleGuard locale_guard;
    int i;
+   AutoPtr<TiXmlDocument> _doc(new TiXmlDocument());
+   _root = 0;
 
    _mol = &mol;
 
@@ -243,6 +243,7 @@ void MoleculeCmlSaver::saveMolecule (Molecule &mol)
    TiXmlPrinter printer;
    _doc->Accept(&printer);
    _output.printf("%s", printer.CStr());
+   _doc.release();
 }
 
 void MoleculeCmlSaver::_addSgroupElement (TiXmlElement *molecule, SGroup &sgroup)
