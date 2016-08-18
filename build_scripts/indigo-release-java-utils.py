@@ -7,12 +7,6 @@ from zipfile import ZipFile
 from optparse import OptionParser
 import re
 
-version = ""
-cur_dir = split(__file__)[0]
-for line in open(join(os.path.dirname(os.path.abspath(__file__)), "..", "api", "indigo-version.cmake")):
-    m = re.search('SET\(INDIGO_VERSION "(.*)"', line)
-    if m:
-        version = m.group(1)
 
 cur_dir = abspath(dirname(__file__))
 root = os.path.normpath(join(cur_dir, ".."))
@@ -31,8 +25,8 @@ for filename in os.listdir(dist_dir):
             shutil.rmtree("indigo-java")
         #os.mkdir("indigo-java")
         java_dir = join(dist_dir, "indigo-java")
-        distVersion = filename.replace("indigo-java-%s-" % version , '').replace('.zip', '')
-        fullChemdiffName = "chemdiff-%s-%s" % (version, distVersion)
+        version = filename.replace("indigo-java-", '').replace('.zip', '')
+        fullChemdiffName = "chemdiff-%s" % (version)
         uz = ZipFile(join(dist_dir, filename))
         uz.extractall(path=dist_dir)
         os.rename(join(dist_dir, filename)[:-4], "indigo-java")
@@ -79,8 +73,8 @@ for filename in os.listdir(dist_dir):
         if os.path.exists("indigo-java"):
             shutil.rmtree("indigo-java")
         java_dir = join(dist_dir, "indigo-java")
-        distVersion = filename.replace("indigo-java-%s-" % version , '').replace('.zip', '')
-        fullLegioName = "legio-%s-%s" % (version, distVersion)
+        version = filename.replace("indigo-java-" , '').replace('.zip', '')
+        fullLegioName = "legio-%s" % (version)
         uz = ZipFile(join(dist_dir, filename))
         uz.extractall(path=dist_dir)
         os.rename(join(dist_dir, filename)[:-4], "indigo-java")

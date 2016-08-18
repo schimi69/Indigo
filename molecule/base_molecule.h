@@ -74,9 +74,9 @@ enum
    SKIP_STEREOCENTERS = 0x02,
    SKIP_XYZ = 0x04,
    SKIP_RGROUP_FRAGMENTS = 0x08,
-   SKIP_ATTACHMENT_POINTS = 0x16,
-   SKIP_TGROUPS = 0x32,
-   SKIP_TEMPLATE_ATTACHMENT_POINTS = 0x64
+   SKIP_ATTACHMENT_POINTS = 0x10,
+   SKIP_TGROUPS = 0x20,
+   SKIP_TEMPLATE_ATTACHMENT_POINTS = 0x40
 };
 
 class Molecule;
@@ -316,6 +316,9 @@ public:
    void getAtomsCenterPoint (Array<int> &atoms, Vec2f &res);
 
    void getAtomSymbol (int v, Array<char> &output);
+
+   int atomCode (int idx);
+   int bondCode (int idx);
 
    DECL_ERROR;
 protected:

@@ -16,7 +16,7 @@ Random::Random(int seed)
    randSeed = seed;
 }
 
-void Random::setSeed(long long x) 
+void Random::setSeed(unsigned long long x) 
 {
    randSeed = x;
 }
@@ -38,7 +38,7 @@ unsigned int Random::next(int mod)
 
 unsigned int Random::nextBounded(int l, int r) 
 {
-   return __min(l, r) + next(abs((long)(r - l)));
+   return __min(l, r) + next(abs(r - l));
 }
 
 unsigned int Random::nextLarge(int mod) 
@@ -51,22 +51,22 @@ unsigned int Random::nextLarge(int mod)
    return nextLarge(mod);
 }
 
-long long Random::nextLong() 
+unsigned long long Random::nextLong()
 {
-   return ((long long)next() << 32) + next();
+   return ((unsigned long long)next() << 32) + next();
 }
 
-long long Random::nextLong(long long mod) 
+unsigned long long Random::nextLong(unsigned long long mod)
 {
    return nextLong() % mod;
 }
 
 double Random::nextDouble() 
 {
-   return 1.0 * next() + 1.0 * next() / (1LL << 32);
+   return 1.0 * next() / (1LL << 32);
 }
 
 double Random::nextDoubleBounded(double l, double r) 
 {
-   return __min(l, r) + nextDouble() * abs((long)(r - l));
+   return __min(l, r) + nextDouble() * fabs(r - l);
 }

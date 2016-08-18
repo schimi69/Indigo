@@ -24,6 +24,8 @@
 #include "molecule/elements.h"
 #include "molecule/smiles_loader.h"
 
+#include "base_cpp/multimap.h"
+
 #define STRCMP(a, b) strncmp((a), (b), strlen(b))
 
 using namespace indigo;
@@ -207,7 +209,11 @@ int MolfileLoader::_getElement (const char *buf)
       if (!isalpha(buf[i]))
          return -1;
 
-      buf2[i] = (i == 0) ? toupper(buf[i]) : tolower(buf[i]);
+//      buf2[i] = (i == 0) ? toupper(buf[i]) : tolower(buf[i]);
+// Removed defensive conversion of input symbols to avoid possible issues with abbreviations like
+//   No <-> NO 
+//   Co <-> CO and etc.
+      buf2[i] = buf[i];
    }
 
    return Element::fromString2(buf2);
@@ -924,7 +930,6 @@ void MolfileLoader::_readCtab2000 ()
                sgroup->original_group = sgroup_idx + 1;
                _sgroup_types[sgroup_idx] = sgroup->sgroup_type;
                _sgroup_mapping[sgroup_idx] = idx;
-
             }
             _scanner.skipLine();
          }
@@ -1432,6 +1437,8 @@ void MolfileLoader::_readCtab2000 ()
       for (int atom_idx = 0; atom_idx < _atoms_num; atom_idx++)
          if (_atom_types[atom_idx] == _ATOM_A)
             throw Error("'any' atoms are allowed only for queries");
+
+   _fillSGroupsParentIndices();
 }
 
 void MolfileLoader::_appendQueryAtom (const char *atom_label, AutoPtr<QueryMolecule::Atom> &atom)
@@ -2738,6 +2745,31 @@ void MolfileLoader::_readSGroupsBlock3000 ()
          continue;
       _readSGroup3000(str.ptr());
    }
+
+   _fillSGroupsParentIndices();
+}
+
+void MolfileLoader::_fillSGroupsParentIndices() {
+   MoleculeSGroups &sgroups = _bmol->sgroups;
+
+   MultiMap<int,int> indices;
+   //original index can be arbitrary, sometimes key is used multiple times
+   
+   for (auto i = sgroups.begin(); i != sgroups.end(); i++) {
+      SGroup &sgroup = sgroups.getSGroup(i);
+      indices.insert(sgroup.original_group, i);
+   }
+
+   //TODO: replace parent_group with parent_idx
+   for (auto i = sgroups.begin(); i != sgroups.end(); i = sgroups.next(i)) {
+      SGroup &sgroup = sgroups.getSGroup(i);
+      auto &set = indices.get(sgroup.parent_group);
+      if (set.size() == 1) {
+         sgroup.parent_idx = set.key(set.begin());
+      } else {
+         sgroup.parent_idx = -1;
+      }
+   }
 }
 
 void MolfileLoader::_readCollectionBlock3000 ()
@@ -2991,6 +3023,8 @@ void MolfileLoader::_readSGroup3000 (const char *str)
    BufferScanner scanner(str);
    QS_DEF(Array<char>, type);
    QS_DEF(Array<char>, entity);
+   entity.clear();
+   type.clear();
 
    MoleculeSGroups *sgroups = &_bmol->sgroups;
 
@@ -3067,6 +3101,7 @@ void MolfileLoader::_readSGroup3000 (const char *str)
       else if (strcmp(entity.ptr(), "SUBTYPE") == 0)
       {
          QS_DEF(Array<char>, subtype);
+         subtype.clear();
          scanner.readWord(subtype, 0);
          if (strcmp(subtype.ptr(), "ALT") == 0)
             sgroup->sgroup_subtype = SGroup::SG_SUBTYPE_ALT;
@@ -3089,6 +3124,7 @@ void MolfileLoader::_readSGroup3000 (const char *str)
       else if (strcmp(entity.ptr(), "BRKTYP") == 0)
       {
          QS_DEF(Array<char>, style);
+         style.clear();
          scanner.readWord(style, 0);
          if (strcmp(style.ptr(), "BRACKET") == 0)
             sgroup->brk_style = _BRKTYP_SQUARE;
@@ -3142,6 +3178,7 @@ void MolfileLoader::_readSGroup3000 (const char *str)
       else if (strcmp(entity.ptr(), "FIELDDISP") == 0)
       {
          QS_DEF(Array<char>, substr);
+         substr.clear();
          _readStringInQuotes(scanner, &substr);
          if (dsg != 0)
          {

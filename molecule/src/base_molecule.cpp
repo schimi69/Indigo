@@ -14,6 +14,7 @@
 
 #include "molecule/base_molecule.h"
 
+#include "base_cpp/crc32.h"
 #include "base_cpp/output.h"
 #include "base_cpp/scanner.h"
 #include "molecule/elements.h"
@@ -119,8 +120,9 @@ void BaseMolecule::mergeSGroupsWithSubmolecule (BaseMolecule &mol, Array<int> &m
       SGroup &supersg = mol.sgroups.getSGroup(i);
       int idx = sgroups.addSGroup(supersg.sgroup_type);
       SGroup &sg = sgroups.getSGroup(idx);
-      if (_mergeSGroupWithSubmolecule(sg, supersg, mol, mapping, edge_mapping))
-      {
+      sg.parent_idx = supersg.parent_idx;
+
+      if (_mergeSGroupWithSubmolecule(sg, supersg, mol, mapping, edge_mapping)) {
          if (sg.sgroup_type == SGroup::SG_TYPE_DAT)
          {
             DataSGroup &dg = (DataSGroup &)sg;
@@ -192,9 +194,9 @@ void BaseMolecule::mergeSGroupsWithSubmolecule (BaseMolecule &mol, Array<int> &m
                if (mapping[supermg.parent_atoms[j]] >= 0)
                   mg.parent_atoms.push(mapping[supermg.parent_atoms[j]]);
          }
-      }
-      else
+      } else {
          sgroups.remove(idx);
+      }
    }
 }
 
@@ -1107,7 +1109,7 @@ void BaseMolecule::collapse (BaseMolecule& bm, int id) {
 void BaseMolecule::collapse (BaseMolecule& bm, int id, Mapping& mapAtom, Mapping& mapBondInv)
 {
    SGroup &sg = bm.sgroups.getSGroup(id);
-  
+
    if (sg.sgroup_type != SGroup::SG_TYPE_MUL)
       throw Error("The group is wrong type");
 
@@ -1118,17 +1120,22 @@ void BaseMolecule::collapse (BaseMolecule& bm, int id, Mapping& mapAtom, Mapping
 
    QS_DEF(Array<int>, toRemove);
    toRemove.clear();
+   
    for (int j = 0; j < group.atoms.size(); ++j) {
       int k = j % group.parent_atoms.size();
-      int *value = mapAtom.at2(group.atoms[j]);
-      if (value == 0)
-         mapAtom.insert(group.atoms[j], group.atoms[k]);
-      else if (*value != group.atoms[k])
+      int from = group.atoms[j];
+      int to   = group.atoms[k];
+
+      int *to_ = mapAtom.at2(from);
+      if (to_ == 0)
+         mapAtom.insert(from, to);
+      else if (*to_ != to)
          throw Error("Invalid mapping in MultipleGroup::collapse");
 
       if (k != j)
-         toRemove.push(group.atoms[j]);
+         toRemove.push(from);
    }
+
    for (int j = bm.edgeBegin(); j < bm.edgeEnd(); j = bm.edgeNext(j)) {
       const Edge& edge = bm.getEdge(j);
       bool in1 = mapAtom.find(edge.beg),
@@ -1513,11 +1520,21 @@ bool BaseMolecule::_mergeSGroupWithSubmolecule (SGroup &sgroup, SGroup &super, B
 {
    int i;
    bool merged = false;
-
+   sgroup.parent_group = super.parent_group;
    sgroup.sgroup_subtype = super.sgroup_subtype;
-
    sgroup.brackets.copy(super.brackets);
-
+   
+   QS_DEF(Array<int>, parent_atoms);
+   parent_atoms.clear();
+   if (supermol.sgroups.getParentAtoms(super, parent_atoms)) {
+      //parent exists
+      for (i = 0; i < parent_atoms.size(); i++) {
+         if (mapping[parent_atoms[i]] >= 0) {
+            merged = true;
+         }
+      }
+   }
+   
    for (i = 0; i < super.atoms.size(); i++)
    {
       if (mapping[super.atoms[i]] >= 0)
@@ -1871,4 +1888,23 @@ void BaseMolecule::getAtomSymbol (int v, Array<char> &result)
    }
    if (result.size() == 0)
       result.readString("*", true);
+}
+
+int BaseMolecule::atomCode (int vertex_idx)
+{
+   if (isPseudoAtom(vertex_idx))
+      return CRC32::get(getPseudoAtom(vertex_idx));
+
+   if (isTemplateAtom(vertex_idx))
+      return CRC32::get(getTemplateAtom(vertex_idx));
+
+   if (isRSite(vertex_idx))
+      return 0;
+
+   return getAtomNumber(vertex_idx);
+}
+
+int BaseMolecule::bondCode (int edge_idx)
+{
+   return getBondOrder(edge_idx);
 }

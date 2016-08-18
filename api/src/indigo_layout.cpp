@@ -19,6 +19,8 @@
 #include "reaction/base_reaction.h"
 #include "indigo_molecule.h"
 #include "indigo_reaction.h"
+#include "layout/molecule_cleaner_2d.h"
+#include <vector>
 
 CEXPORT int indigoLayout (int object)
 {
@@ -47,6 +49,7 @@ CEXPORT int indigoLayout (int object)
          }
 
          ml.make();
+      
          if (obj.type != IndigoObject::SUBMOLECULE)
          {
             // Not for submolecule yet
@@ -75,6 +78,8 @@ CEXPORT int indigoLayout (int object)
          ReactionLayout rl(rxn, self.smart_layout);
          rl.max_iterations = self.layout_max_iterations;
          rl.bond_length = 1.6f;
+         rl.horizontal_interval_factor = self.layout_horintervalfactor;
+
          rl.make();
          rxn.markStereocenterBonds();
       } else {
@@ -83,4 +88,23 @@ CEXPORT int indigoLayout (int object)
       return 0;
    }
    INDIGO_END(-1)
+}
+
+CEXPORT int indigoClean2d(int object)
+{
+    INDIGO_BEGIN
+    {
+        IndigoObject &obj = self.getObject(object);
+
+        if (IndigoBaseMolecule::is(obj) || obj.type == IndigoObject::SUBMOLECULE) {
+            BaseMolecule &mol = obj.getBaseMolecule();
+            MoleculeCleaner2d cleaner2d1(mol, false);
+            cleaner2d1.clean(false);
+            MoleculeCleaner2d cleaner2d2(mol, true);
+            cleaner2d2.clean(true);
+
+        }
+        return 0;
+    }
+    INDIGO_END(-1)
 }

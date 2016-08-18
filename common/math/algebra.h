@@ -41,6 +41,47 @@ const float PI = 3.14159265358979323846f;
 
 const float INFINITY = 1000000.f;
 
+// frac of type 1/n for acos_stable
+const float frac1[25] = { 0,
+                          1.,
+                          1. / 2,
+                          1. / 3,
+                          1. / 4,
+                          1. / 5,
+                          1. / 6,
+                          1. / 7,
+                          1. / 8,
+                          1. / 9,
+                          1. / 10,
+                          1. / 11,
+                          1. / 12,
+                          1. / 13,
+                          1. / 14,
+                          1. / 15,
+                          1. / 16,
+                          1. / 17,
+                          1. / 18,
+                          1. / 19,
+                          1. / 20,
+                          1. / 21,
+                          1. / 22,
+                          1. / 23,
+                          1. / 24 };
+
+static float asin_stable(float x) {
+    float x2 = x * x;
+    float res = 0;
+    float y = x;
+    for (int i = 0; i < 12; i++) {
+        res += y * frac1[2*i + 1];
+        y *= (1. - frac1[2*i + 2]) * x2;
+    }
+    return res;
+}
+
+static float acos_stable(float x) {
+    return PI / 2 - asin_stable(x);
+}
 
 struct Transform3f;
 
@@ -231,11 +272,64 @@ struct Vec2f
    DLLEXPORT static bool segmentsIntersect (const Vec2f &a0, const Vec2f &a1, const Vec2f &b0, const Vec2f &b1);
    DLLEXPORT static bool segmentsIntersectInternal (const Vec2f &a0, const Vec2f &a1, const Vec2f &b0, const Vec2f &b1);
 
-   DLLEXPORT static double distPointSegment(Vec2f p, Vec2f q, Vec2f r);
-   DLLEXPORT static double distSegmentSegment(Vec2f p, Vec2f q, Vec2f r, Vec2f s);
+   DLLEXPORT static float distPointSegment(Vec2f p, Vec2f q, Vec2f r);
+   DLLEXPORT static float distSegmentSegment(Vec2f p, Vec2f q, Vec2f r, Vec2f s);
 
-   DLLEXPORT static Vec2f get_circle_center(Vec2f p, Vec2f q, double angle);
+   DLLEXPORT static Vec2f get_circle_center(Vec2f p, Vec2f q, float angle);
    DLLEXPORT static Vec2f get_circle_center(Vec2f a, Vec2f b, Vec2f c);
+};
+
+struct Rect2f {
+
+   explicit Rect2f () {}
+
+   Rect2f (Vec2f a, Vec2f b)
+   {
+      _leftBottom = a;
+      _leftBottom.min(b);
+      _rightTop = a;
+      _rightTop.max(b);
+   }
+
+   Rect2f (Rect2f a, Rect2f b)
+   {
+      _leftBottom = a._leftBottom;
+      _leftBottom.min(b._leftBottom);
+      _rightTop = a._rightTop;
+      _rightTop.max(b._rightTop);
+   }
+
+   inline void copy (Rect2f &other)
+   {
+      _leftBottom = other._leftBottom;
+      _rightTop   = other._rightTop;
+   }
+
+   inline float left() const { return _leftBottom.x; }
+   inline float right() const { return _rightTop.x; }
+   inline float bottom() const { return _leftBottom.y; }
+   inline float top() const { return _rightTop.y; }
+
+   inline float middleX() const { return (_leftBottom.x + _rightTop.x) / 2; }
+   inline float middleY() const { return (_leftBottom.y + _rightTop.y) / 2; }
+
+   inline Vec2f leftBottom() const { return _leftBottom; }
+   inline Vec2f rightTop() const { return _rightTop; }
+
+   inline Vec2f leftTop() const { return Vec2f(left(), top()); }
+   inline Vec2f rightBottom() const { return Vec2f(right(), bottom()); }
+
+   inline Vec2f leftMiddle() const { return Vec2f(left(), middleY()); }
+   inline Vec2f rightMiddle() const { return Vec2f(right(), middleY()); }
+
+   inline Vec2f bottomMiddle() const { return Vec2f(middleX(), bottom()); }
+   inline Vec2f topMiddle() const { return Vec2f(middleX(), top()); }
+
+   inline Vec2f center() const { return Vec2f(middleX(), middleY()); }
+
+protected:
+   Vec2f _leftBottom;
+   Vec2f _rightTop;
 };
 
 struct Vec3f

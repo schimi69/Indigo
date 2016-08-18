@@ -17,6 +17,7 @@
 #include "layout/molecule_layout_graph.h"
 
 #include <memory>
+#include <vector>
 
 using namespace indigo;
 
@@ -380,10 +381,11 @@ void MoleculeLayoutGraphSmart::_layoutSingleComponent (BaseMolecule &molecule, b
          }
    }
 
+
    if (vertexCount() > 1)
    {
-      _calcMorganCodes();
-      _assignAbsoluteCoordinates(bond_length);
+       _calcMorganCodes();
+       _assignAbsoluteCoordinates(bond_length);
    }
    _assignFinalCoordinates(bond_length, src_layout);
 }
@@ -430,7 +432,7 @@ _finish(finish)
    }
 
    // double ternary search of center of component
-   double MLx = 0, Ly = 0, MRx = 0, Ry = 0, Lx, Rx;
+   float MLx = 0, Ly = 0, MRx = 0, Ry = 0, Lx, Rx;
    for (int v : _graph.vertices()) {
 	   MLx = __min(MLx, _pos[v].x);
 	   MRx = __max(MRx, _pos[v].x);
@@ -438,15 +440,15 @@ _finish(finish)
 	   Ry = __max(Ry, _pos[v].y);
    }
    while (Ry - Ly > EPSILON) {
-	   double dy = (Ry - Ly) / 3;
-	   double ry[2];
-	   double My = Ly + dy;
+	   float dy = (Ry - Ly) / 3;
+	   float ry[2];
+	   float My = Ly + dy;
 	   for (int i = 0; i < 2; i++) {
 		   Lx = MLx, Rx = MRx;
-		   double rx[2];
+		   float rx[2];
 		   while (Rx - Lx > EPSILON) {
-			   double dx = (Rx - Lx) / 3;
-			   double Mx = Lx + dx;
+			   float dx = (Rx - Lx) / 3;
+			   float Mx = Lx + dx;
 			   for (int j = 0; j < 2; j++) {
 				   rx[j] = calc_radius(Vec2f(Mx, My));
 				   Mx += dx;
@@ -464,14 +466,15 @@ _finish(finish)
    _radius = 0;
    Vec2f center(0.5, 0);
    for (int v : _graph.vertices()) {
-      double dist = (center - _pos[v]).length();
+      float dist = (center - _pos[v]).length();
       if (dist > _radius) _radius = dist;
    }
    _center = center;*/
+   _square = 0;
 }
 
-double MoleculeLayoutSmoothingSegment::calc_radius(Vec2f c) {
-	double answer = 0;
+float MoleculeLayoutSmoothingSegment::calc_radius(Vec2f c) {
+	float answer = 0;
 	for (int v : _graph.vertices()) answer = __max(answer, (c - _pos[v]).lengthSqr());
 	return sqrt(answer);
 }
@@ -487,7 +490,7 @@ void MoleculeLayoutSmoothingSegment::updateStartFinish() {
    _length = (_start - _finish).length();
 }
 
-double MoleculeLayoutSmoothingSegment::get_radius() {
+float MoleculeLayoutSmoothingSegment::get_radius() {
    return _radius * _length;
 }
 
@@ -612,14 +615,14 @@ void MoleculeLayoutSmoothingSegment::set_start_finish_number(int s, int f) {
 
    _radius = 0;
    for (int v : _graph.vertices()) {
-	   double dist = (_center - _pos[v]).length();
+	   float dist = (_center - _pos[v]).length();
 	   if (dist > _radius) _radius = dist;
    }
 
    calculate_square();
 }
 
-double MoleculeLayoutSmoothingSegment::get_square() {
+float MoleculeLayoutSmoothingSegment::get_square() {
    return _square;
 }
 

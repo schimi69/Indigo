@@ -32,6 +32,12 @@
 
 namespace indigo {
 
+    const int SOME_MAGIC_INT_FOR_RANDOM_1 = 931170243;
+    const int SOME_MAGIC_INT_FOR_RANDOM_2 = 931170240;
+    const int SOME_MAGIC_INT_FOR_RANDOM_3 = 931170242;
+    const int SOME_MAGIC_INT_FOR_RANDOM_4 = 931170241;
+
+
 class BiconnectedDecomposer;
 
 #ifdef _DEBUG
@@ -340,9 +346,9 @@ struct local_pair_ii {
 
 struct local_pair_id {
     int left;
-    double right;
+    float right;
 
-    local_pair_id(int l, double r) { left = l; right = r; }
+    local_pair_id(int l, float r) { left = l; right = r; }
 };
 
 class MoleculeLayoutGraphSmart;
@@ -360,11 +366,11 @@ private:
     Vec2f& _finish;
     Vec2f _center;
     int _layout_component_number;
-    double _square;
-    double _radius;
+    float _square;
+    float _radius;
 
     Vec2f _getPosition(Vec2f);
-    double calc_radius(Vec2f);
+    float calc_radius(Vec2f);
 
 public:
     MoleculeLayoutGraphSmart& _graph;
@@ -384,11 +390,11 @@ public:
     void set_layout_component_number(int number);
     void inverse();
     void set_start_finish_number(int, int);
-    double get_square();
+    float get_square();
     void calculate_square();
     int get_start() const;
     int get_finish() const;
-    double get_radius();
+    float get_radius();
     bool can_touch_to(MoleculeLayoutSmoothingSegment&);
 
     bool is_start(int v) { return v == _start_number; }
@@ -426,11 +432,11 @@ public:
     void _do_smoothing(int iter_count);
 
 
-    void _gradient_step(float coef, Array<local_pair_ii>& touching_segments);
+    void _gradient_step(float coef, Array<local_pair_ii>& touching_segments, bool);
 
-    static Vec2f _get_len_derivative(Vec2f current_vector, float target_dist);
+    static Vec2f _get_len_derivative(Vec2f current_vector, float target_dist, bool);
     static Vec2f _get_len_derivative_simple(Vec2f current_vector, float target_dist);
-    static Vec2f _get_angle_derivative(Vec2f left_point, Vec2f right_point, float target_angle);
+    static Vec2f _get_angle_derivative(Vec2f left_point, Vec2f right_point, float target_angle, bool flag = false);
 
 
 };
@@ -466,7 +472,7 @@ public:
 
     const int *getEdgeMapping() { return _molecule_edge_mapping; }
 
-    double _get_square();
+    float _get_square();
     void flipped() { ; }
 
 #ifdef M_LAYOUT_DEBUG
