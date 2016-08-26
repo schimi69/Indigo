@@ -2844,9 +2844,9 @@ void MolfileSaver::_calcEZStereoDescriptor (BaseMolecule &mol, BaseMolecule &unf
 int MolfileSaver::_cip_rules_cmp (int &i1, int &i2, void *context)
 {
    int res = 0;
-   Array<int> cip;
-   Array<int> used1;
-   Array<int> used2;
+   QS_DEF(Array<int>, cip);
+   QS_DEF(Array<int>, used1);
+   QS_DEF(Array<int>, used2);
 
    CIPContext *cur_context = (CIPContext *)context;
    BaseMolecule &mol = *(BaseMolecule *)cur_context->mol;
@@ -2921,8 +2921,8 @@ int MolfileSaver::_cip_rules_cmp (int &i1, int &i2, void *context)
    }
 
    const Vertex &v1 = mol.getVertex(i1);
-   Array<int> neibs1;
-   Array<int> cip_neibs1;
+   QS_DEF(Array<int>, neibs1);
+   QS_DEF(Array<int>, cip_neibs1);
    neibs1.clear();
    cip_neibs1.clear();
    for (auto i : v1.neighbors())
@@ -2934,9 +2934,9 @@ int MolfileSaver::_cip_rules_cmp (int &i1, int &i2, void *context)
    }
    if (neibs1.size() > 1)
    {
-      CIPContext next_context;
-      Array<int> used1_next;
-      Array<int> used2_next;
+      QS_DEF(CIPContext, next_context);
+      QS_DEF(Array<int>, used1_next);
+      QS_DEF(Array<int>, used2_next);
       used1_next.copy(used1);
       used1_next.push(i1);
       used2_next.copy(used1_next);
@@ -3107,8 +3107,8 @@ int MolfileSaver::_cip_rules_cmp (int &i1, int &i2, void *context)
    }
 
    const Vertex &v2 = mol.getVertex(i2);
-   Array<int> neibs2;
-   Array<int> cip_neibs2;
+   QS_DEF(Array<int>, neibs2);
+   QS_DEF(Array<int>, cip_neibs2);
    neibs2.clear();
    cip_neibs2.clear();
 
@@ -3121,9 +3121,9 @@ int MolfileSaver::_cip_rules_cmp (int &i1, int &i2, void *context)
    }
    if (neibs2.size() > 1)
    {
-      CIPContext next_context;
-      Array<int> used1_next;
-      Array<int> used2_next;
+      QS_DEF(CIPContext, next_context);
+      QS_DEF(Array<int>, used1_next);
+      QS_DEF(Array<int>, used2_next);
       used1_next.copy(used2);
       used1_next.push(i2);
       used2_next.copy(used1_next);
@@ -3397,9 +3397,9 @@ int MolfileSaver::_cip_rules_cmp (int &i1, int &i2, void *context)
       {
          for (auto i = 0; i < next_level_branches; i++)
          {       
-            CIPContext next_context;
-            Array<int> used1_next;
-            Array<int> used2_next;
+            QS_DEF(CIPContext, next_context);
+            QS_DEF(Array<int>, used1_next);
+            QS_DEF(Array<int>, used2_next);
             used1_next.copy(used1);
             used1_next.push(i1);
             used2_next.copy(used2);
@@ -3424,9 +3424,9 @@ int MolfileSaver::_cip_rules_cmp (int &i1, int &i2, void *context)
 
          for (auto i = 0; i < next_level_branches; i++)
          {       
-            CIPContext next_context;
-            Array<int> used1_next;
-            Array<int> used2_next;
+            QS_DEF(CIPContext, next_context);
+            QS_DEF(Array<int>, used1_next);
+            QS_DEF(Array<int>, used2_next);
             used1_next.copy(used1);
             used1_next.push(i1);
             used2_next.copy(used2);
@@ -3468,9 +3468,9 @@ int MolfileSaver::_cip_rules_cmp (int &i1, int &i2, void *context)
       }
       if (isotope_found > 0)
       {
-         CIPContext next_context;
-         Array<int> used1_next;
-         Array<int> used2_next;
+         QS_DEF(CIPContext, next_context);
+         QS_DEF(Array<int>, used1_next);
+         QS_DEF(Array<int>, used2_next);
          used1_next.copy(used1);
          used2_next.copy(used2);
          next_context.mol  = &mol;
@@ -3493,9 +3493,9 @@ int MolfileSaver::_cip_rules_cmp (int &i1, int &i2, void *context)
 
       if (isotope_found > 0)
       {
-         CIPContext next_context;
-         Array<int> used1_next;
-         Array<int> used2_next;
+         QS_DEF(CIPContext, next_context);
+         QS_DEF(Array<int>, used1_next);
+         QS_DEF(Array<int>, used2_next);
          used1_next.copy(used1);
          used2_next.copy(used2);
          next_context.mol  = &mol;
@@ -3521,9 +3521,9 @@ int MolfileSaver::_cip_rules_cmp (int &i1, int &i2, void *context)
    {
       if (_getNumberOfStereoDescritors(cip) > 0)
       {
-         CIPContext next_context;
-         Array<int> used1_next;
-         Array<int> used2_next;
+         QS_DEF(CIPContext, next_context);
+         QS_DEF(Array<int>, used1_next);
+         QS_DEF(Array<int>, used2_next);
          used1_next.copy(used1);
          used2_next.copy(used2);
          next_context.mol  = &mol;
@@ -3546,9 +3546,9 @@ int MolfileSaver::_cip_rules_cmp (int &i1, int &i2, void *context)
       }
       if (_getNumberOfStereoDescritors(cip) > 0)
       {
-         CIPContext next_context;
-         Array<int> used1_next;
-         Array<int> used2_next;
+         QS_DEF(CIPContext, next_context);
+         QS_DEF(Array<int>, used1_next);
+         QS_DEF(Array<int>, used2_next);
          used1_next.copy(used1);
          used2_next.copy(used2);
          next_context.mol  = &mol;
@@ -3575,9 +3575,9 @@ int MolfileSaver::_cip_rules_cmp (int &i1, int &i2, void *context)
    {
       if (_getNumberOfStereoDescritors(cip) > 0)
       {
-         CIPContext next_context;
-         Array<int> used1_next;
-         Array<int> used2_next;
+         QS_DEF(CIPContext, next_context);
+         QS_DEF(Array<int>, used1_next);
+         QS_DEF(Array<int>, used2_next);
          used1_next.copy(used1);
          used2_next.copy(used2);
          next_context.mol  = &mol;
@@ -3601,9 +3601,9 @@ int MolfileSaver::_cip_rules_cmp (int &i1, int &i2, void *context)
 
       if (_getNumberOfStereoDescritors(cip) > 0)
       {
-         CIPContext next_context;
-         Array<int> used1_next;
-         Array<int> used2_next;
+         QS_DEF(CIPContext, next_context);
+         QS_DEF(Array<int>, used1_next);
+         QS_DEF(Array<int>, used2_next);
          used1_next.copy(used1);
          used2_next.copy(used2);
          next_context.mol  = &mol;
