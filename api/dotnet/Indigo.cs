@@ -652,6 +652,7 @@ namespace com.epam.indigo
                     bool vs2010 = true;
                     bool vs2012 = true;
                     bool vs2013 = true;
+                    bool vs2015 = true;
                     try
                     {
                        dll_loader.loadLibrary(lib_path, "msvcr100.dll", "com.epam.indigo.Properties.ResourcesWin2010", false);
@@ -670,11 +671,19 @@ namespace com.epam.indigo
                     }
                     try
                     {
-                       dll_loader.loadLibrary(lib_path, "msvcr120.dll", "com.epam.indigo.Properties.ResourcesWin2013", false);
+                        dll_loader.loadLibrary(lib_path, "msvcr120.dll", "com.epam.indigo.Properties.ResourcesWin2013", false);
                     }
-                    catch 
+                    catch
                     {
                         vs2013 = false;
+                    }
+                    try
+                    {
+                        dll_loader.loadLibrary(lib_path, "vcruntime140.dll", "com.epam.indigo.Properties.ResourcesWin2015", false);
+                    }
+                    catch
+                    {
+                        vs2015 = false;
                     }
 
                     if (vs2010) 
@@ -691,9 +700,15 @@ namespace com.epam.indigo
                     }
                     else if (vs2013)
                     {
-                       dll_loader.loadLibrary(lib_path, "msvcr120.dll", "com.epam.indigo.Properties.ResourcesWin2013", false);
-                       dll_loader.loadLibrary(lib_path, "msvcp120.dll", "com.epam.indigo.Properties.ResourcesWin2013", false);
-                       dll_loader.loadLibrary(lib_path, libraryName, "com.epam.indigo.Properties.ResourcesWin2013", false);   
+                        dll_loader.loadLibrary(lib_path, "msvcr120.dll", "com.epam.indigo.Properties.ResourcesWin2013", false);
+                        dll_loader.loadLibrary(lib_path, "msvcp120.dll", "com.epam.indigo.Properties.ResourcesWin2013", false);
+                        dll_loader.loadLibrary(lib_path, libraryName, "com.epam.indigo.Properties.ResourcesWin2013", false);
+                    }
+                    else if (vs2015)
+                    {
+                        dll_loader.loadLibrary(lib_path, "vcruntime140.dll", "com.epam.indigo.Properties.ResourcesWin2015", false);
+                        dll_loader.loadLibrary(lib_path, "msvcp140.dll", "com.epam.indigo.Properties.ResourcesWin2015", false);
+                        dll_loader.loadLibrary(lib_path, libraryName, "com.epam.indigo.Properties.ResourcesWin2015", false);
                     }
                     
                     break;
