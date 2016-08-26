@@ -18,6 +18,32 @@ def updatePomVersion(pomFile, newVersion):
             break
     tree.write(pomFile)
 
+def getValidAssemblyVersion(version):
+    if (re.match('^\d*\.\d*\.\d*\.(\d*|\*)', version)):
+        validVersion = version
+    elif(re.match('^(\d*\.\d*\.\d*).*', version)):
+        validVersion = re.sub('^(\d*\.\d*\.\d*).*', '\\1.*', version)
+    elif(re.match('^(\d*\.\d*).*', version)):
+        validVersion = re.sub('^(\d*\.\d*).*', '\\1.*.*', version)
+    else:
+        validVersion = "1.0.0.*"
+    return validVersion
+	
+def updateAssemblyVersion(assemblyFile, newAssemblyVersion):
+    p1 = re.compile('^([^/]*\[assembly\: AssemblyVersion\(")(.*)(\"\)\])', re.MULTILINE)
+    p2 = re.compile('^([^/]*\[assembly\: AssemblyFileVersion\(")(.*)(\"\)\])', re.MULTILINE)
+    with open(assemblyFile, 'r') as f:
+        assemblyText = f.read()
+        m1 = p1.search(assemblyText)
+        r1 = p1.sub('{0}{1}{2}'.format(m1.group(1), newAssemblyVersion, m1.group(3)), assemblyText)
+        newAssemblyFileVersion = re.sub('\*', '0', newAssemblyVersion) # * is not allowed for AssemblyFileVersion
+        m2 = p2.search(r1)
+        r2 = p2.sub('{0}{1}{2}'.format(m2.group(1), newAssemblyFileVersion, m2.group(3)), r1)
+    print('Updating AssemblyVersion from {0} to {1} in {2}...'.format(m1.group(2), newAssemblyVersion, assemblyFile))
+    print('Updating AssemblyFileVersion from {0} to {1} in {2}...'.format(m2.group(2), newAssemblyFileVersion, assemblyFile))
+    with open(assemblyFile, 'w') as f:
+        f.write(r2)
+
 
 def main(newVersion):
     indigoVersion = newVersion
@@ -26,6 +52,11 @@ def main(newVersion):
     updatePomVersion(os.path.join(INDIGO_PATH, 'api', 'plugins', 'inchi', 'java', 'pom.xml'), indigoVersion)
     updatePomVersion(os.path.join(INDIGO_PATH, 'api', 'plugins', 'renderer', 'java', 'pom.xml'), indigoVersion)
 
+    newAssemblyVersion = getValidAssemblyVersion(indigoVersion)
+    updateAssemblyVersion(os.path.join(INDIGO_PATH, 'api', 'dotnet', 'Properties', 'AssemblyInfo.cs'), newAssemblyVersion)
+    updateAssemblyVersion(os.path.join(INDIGO_PATH, 'api', 'plugins', 'bingo', 'dotnet', 'Properties', 'AssemblyInfo.cs'), newAssemblyVersion)
+    updateAssemblyVersion(os.path.join(INDIGO_PATH, 'api', 'plugins', 'inchi', 'dotnet', 'Properties', 'AssemblyInfo.cs'), newAssemblyVersion)
+    updateAssemblyVersion(os.path.join(INDIGO_PATH, 'api', 'plugins', 'renderer', 'dotnet', 'Properties', 'AssemblyInfo.cs'), newAssemblyVersion)
 
 if __name__ == '__main__':
     main(sys.argv[1])
