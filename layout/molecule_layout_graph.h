@@ -127,6 +127,7 @@ public:
     bool _flipped; // component was flipped after attaching
 
     int max_iterations;
+    layout_orientation_value layout_orientation;
 
     CancellationHandler* cancellation;
 

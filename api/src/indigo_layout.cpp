@@ -34,6 +34,7 @@ CEXPORT int indigoLayout (int object)
          MoleculeLayout ml(mol, self.smart_layout);
          ml.max_iterations = self.layout_max_iterations;
          ml.bond_length = 1.6f;
+         ml.layout_orientation = (layout_orientation_value) self.layout_orientation;
 
          TimeoutCancellationHandler cancellation(self.cancellation_timeout);
          ml.setCancellationHandler(&cancellation);
@@ -77,6 +78,7 @@ CEXPORT int indigoLayout (int object)
          BaseReaction &rxn = obj.getBaseReaction();
          ReactionLayout rl(rxn, self.smart_layout);
          rl.max_iterations = self.layout_max_iterations;
+         rl.layout_orientation = (layout_orientation_value) self.layout_orientation;
          rl.bond_length = 1.6f;
          rl.horizontal_interval_factor = self.layout_horintervalfactor;
 
