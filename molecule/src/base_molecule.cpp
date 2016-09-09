@@ -114,14 +114,20 @@ void BaseMolecule::mergeSGroupsWithSubmolecule (BaseMolecule &mol, Array<int> &m
                                               Array<int> &edge_mapping)
 {
    int i;
+   RedBlackMap<int,int> ogp2idx;
+   ogp2idx.clear();
 
    for (i = mol.sgroups.begin(); i != mol.sgroups.end(); i = mol.sgroups.next(i))
    {
       SGroup &supersg = mol.sgroups.getSGroup(i);
       int idx = sgroups.addSGroup(supersg.sgroup_type);
       SGroup &sg = sgroups.getSGroup(idx);
-      sg.parent_idx = supersg.parent_idx;
 
+      // this assumes that there are no two identical original_group numbers in the same molecule
+      ogp2idx.insert(supersg.original_group, idx);
+
+      // the call to _mergeSGroupWithSubmolecule() will automatically set sg.parent_group to supersg.parent_group
+      // no matter if the parent group will survive in the end
       if (_mergeSGroupWithSubmolecule(sg, supersg, mol, mapping, edge_mapping)) {
          if (sg.sgroup_type == SGroup::SG_TYPE_DAT)
          {
@@ -196,6 +202,17 @@ void BaseMolecule::mergeSGroupsWithSubmolecule (BaseMolecule &mol, Array<int> &m
          }
       } else {
          sgroups.remove(idx);
+      }
+   }
+   //correct the child-parent linkage
+   for (int k = sgroups.begin(); k != sgroups.end(); k = sgroups.next(k))
+   {
+      SGroup &sgp = sgroups.getSGroup(k);
+      sgp.original_group = k + 1;
+      if (sgp.parent_group > 0)
+      {
+         sgp.parent_idx = ogp2idx.at(sgp.parent_group);
+         sgp.parent_group = sgp.parent_idx + 1;
       }
    }
 }
