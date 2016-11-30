@@ -35,8 +35,6 @@ CEXPORT const char * indigoVersion ()
 
 void Indigo::init ()
 {
-   timeout_cancellation_handler = 0;
-
    error_handler = 0;
    error_handler_context = 0;
    _next_id = 1001;
@@ -70,6 +68,7 @@ void Indigo::init ()
    molfile_saving_add_implicit_h = true;
 
    smiles_saving_write_name = false;
+   smiles_saving_smarts_mode = false;
 
    aam_cancellation_timeout = 0;
    cancellation_timeout = 0;
@@ -107,10 +106,13 @@ void Indigo::removeAllObjects ()
    _objects.clear();
 }
 
-void Indigo::resetCancellationHandler ()
+void Indigo::updateCancellationHandler ()
 {
-   timeout_cancellation_handler.reset(cancellation_timeout);
-   setCancellationHandler(&timeout_cancellation_handler);
+    if (cancellation_timeout > 0) {
+        resetCancellationHandler(new TimeoutCancellationHandler(cancellation_timeout));
+    } else {
+        resetCancellationHandler(nullptr);
+    }
 }
 
 void Indigo::initMolfileSaver (MolfileSaver &saver)
@@ -213,9 +215,7 @@ CEXPORT void indigoSetErrorMessage (const char *message)
 int Indigo::addObject (IndigoObject *obj)
 {
    OsLocker lock(_objects_lock);
-
    int id = _next_id++;
-
    _objects.insert(id, obj);
    return id;
 }
@@ -223,10 +223,8 @@ int Indigo::addObject (IndigoObject *obj)
 void Indigo::removeObject (int id)
 {
    OsLocker lock(_objects_lock);
-
    if (_objects.at2(id) == 0)
       return;
-
    delete _objects.at(id);
    _objects.remove(id);
 }

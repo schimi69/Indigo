@@ -37,10 +37,6 @@ IMPL_ERROR(MolfileSaver, "molfile saver");
 CP_DEF(MolfileSaver);
 
 MolfileSaver::MolfileSaver (Output &output) :
-reactionAtomMapping(0),
-reactionAtomInversion(0),
-reactionAtomExactChange(0),
-reactionBondReactingCenter(0),
  _output(output),
  CP_INIT,
 TL_CP_GET(_atom_mapping),
@@ -144,6 +140,10 @@ void MolfileSaver::_saveMolecule (BaseMolecule &mol, bool query)
       _output.writeStringCR("$END HDR");
       _output.writeStringCR("$CTAB");
    }
+
+
+   _updateCIPStereoDescriptors(mol);
+
 
    if (_v2000)
    {
@@ -450,12 +450,9 @@ void MolfileSaver::_writeCtab (Output &output, BaseMolecule &mol, bool query)
 
       int aam = 0, ecflag = 0, irflag = 0;
 
-      if (reactionAtomMapping != 0)
-         aam = reactionAtomMapping->at(i);
-      if (reactionAtomInversion != 0)
-         irflag = reactionAtomInversion->at(i);
-      if (reactionAtomExactChange != 0)
-         ecflag = reactionAtomExactChange->at(i);
+      aam = mol.reaction_atom_mapping[i];
+      irflag = mol.reaction_atom_inversion[i];
+      ecflag = mol.reaction_atom_exact_change[i];
 
       Vec3f &xyz = mol.getAtomXyz(i);
       int charge = mol.getAtomCharge(i);
@@ -672,9 +669,7 @@ void MolfileSaver::_writeCtab (Output &output, BaseMolecule &mol, bool query)
       }
 
       int reacting_center = 0;
-
-      if(reactionBondReactingCenter != 0 && reactionBondReactingCenter->at(i) != 0)
-         reacting_center = reactionBondReactingCenter->at(i);
+      reacting_center = mol.reaction_bond_reacting_center[i];
 
       if (reacting_center != 0)
          out.printf(" RXCTR=%d", reacting_center);
@@ -786,8 +781,6 @@ void MolfileSaver::_writeCtab (Output &output, BaseMolecule &mol, bool query)
       output.writeStringCR("M  V30 END COLLECTION");
    }
 
-   _updateCIPStereoDescriptors(mol);
-
    _checkSGroupIndices(mol);
 
    if (mol.countSGroups() > 0)
@@ -835,6 +828,12 @@ void MolfileSaver::_writeCtab (Output &output, BaseMolecule &mol, bool query)
                                sup.attachment_points[j].apid.ptr());
                }
             }
+            if (sup.seqid > 0)
+               out.printf(" SEQID=%d", sup.seqid);
+
+            if (sup.sa_natreplace.size() > 1)
+               out.printf(" NATREPLACE=%s", sup.sa_natreplace.ptr());
+
             _writeMultiString(output, buf.ptr(), buf.size());
          }
          else if (sgroup.sgroup_type == SGroup::SG_TYPE_DAT)
@@ -1077,7 +1076,7 @@ void MolfileSaver::_writeTGroup (Output &output, BaseMolecule &mol, int tg_idx)
 
    _writeMultiString(output, buf.ptr(), buf.size());
 
-   _writeCtab(output, *tgroup.fragment, mol.isQueryMolecule());
+   _writeCtab(output, *tgroup.fragment.get(), mol.isQueryMolecule());
 
 }
 
@@ -1197,12 +1196,9 @@ void MolfileSaver::_writeCtab2000 (Output &output, BaseMolecule &mol, bool query
             isotopes.push(i);
       }
 
-      if (reactionAtomMapping != 0)
-         aam = reactionAtomMapping->at(i);
-      if (reactionAtomInversion != 0)
-         irflag = reactionAtomInversion->at(i);
-      if (reactionAtomExactChange != 0)
-         ecflag = reactionAtomExactChange->at(i);
+      aam = mol.reaction_atom_mapping[i];
+      irflag = mol.reaction_atom_inversion[i];
+      ecflag = mol.reaction_atom_exact_change[i];
 
       int explicit_valence = -1;
 
@@ -1371,8 +1367,7 @@ void MolfileSaver::_writeCtab2000 (Output &output, BaseMolecule &mol, bool query
       else if (indigo_topology == TOPOLOGY_CHAIN)
          topology = 2;
 
-      if(reactionBondReactingCenter != 0 && reactionBondReactingCenter->at(i) != 0)
-         reacting_center = reactionBondReactingCenter->at(i);
+      reacting_center = mol.reaction_bond_reacting_center[i];
 
       output.printfCR("%3d%3d%3d%3d%3d%3d%3d",
                 _atom_mapping[edge.beg], _atom_mapping[edge.end],
@@ -1498,7 +1493,21 @@ void MolfileSaver::_writeCtab2000 (Output &output, BaseMolecule &mol, bool query
       output.writeCR();
    }
 
-   _updateCIPStereoDescriptors(mol);
+   for (i = mol.sgroups.begin(); i != mol.sgroups.end(); i = mol.sgroups.next(i))
+   {
+      SGroup &sgroup = mol.sgroups.getSGroup(i);
+      if (sgroup.sgroup_type == SGroup::SG_TYPE_DAT)
+      {
+         DataSGroup &dsg = (DataSGroup &)sgroup;
+         if ( (dsg.name.size() > 11) && (strncmp(dsg.name.ptr(), "INDIGO_ALIAS", 12) == 0) &&
+              (dsg.atoms.size() > 0) && dsg.data.size() > 0)
+         {
+            output.printfCR("A  %3d", _atom_mapping[dsg.atoms[0]]);
+            output.writeString(dsg.data.ptr());
+            output.writeCR();
+         }
+      }
+   }
 
    QS_DEF(Array<int>, sgroup_ids);
    QS_DEF(Array<int>, child_ids);
@@ -1510,6 +1519,13 @@ void MolfileSaver::_writeCtab2000 (Output &output, BaseMolecule &mol, bool query
 
    for (i = mol.sgroups.begin(); i != mol.sgroups.end(); i = mol.sgroups.next(i))
    {
+      SGroup &sgroup = mol.sgroups.getSGroup(i);
+      if (sgroup.sgroup_type == SGroup::SG_TYPE_DAT)
+      {
+         DataSGroup &dsg = (DataSGroup &)sgroup;
+         if ( (dsg.name.size() > 11) && (strncmp(dsg.name.ptr(), "INDIGO_ALIAS", 12) == 0) )
+            continue;
+      }
       sgroup_ids.push(i);
    }
 
@@ -1580,6 +1596,13 @@ void MolfileSaver::_writeCtab2000 (Output &output, BaseMolecule &mol, bool query
       for (i = mol.sgroups.begin(); i != mol.sgroups.end(); i = mol.sgroups.next(i))
       {
          SGroup &sgroup = mol.sgroups.getSGroup(i);
+
+         if (sgroup.sgroup_type == SGroup::SG_TYPE_DAT)
+         {
+            DataSGroup &datasgroup = (DataSGroup &)sgroup;
+            if ( (datasgroup.name.size() > 11) && (strncmp(datasgroup.name.ptr(), "INDIGO_ALIAS", 12) == 0) )
+               continue;
+         }
 
          for (j = 0; j < sgroup.atoms.size(); j += 8)
          {
@@ -1659,6 +1682,9 @@ void MolfileSaver::_writeCtab2000 (Output &output, BaseMolecule &mol, bool query
          else if (sgroup.sgroup_type == SGroup::SG_TYPE_DAT)
          {
             DataSGroup &datasgroup = (DataSGroup &)sgroup;
+
+            if ( (datasgroup.name.size() > 11) && (strncmp(datasgroup.name.ptr(), "INDIGO_ALIAS", 12) == 0) )
+               continue;
 
             output.printf("M  SDT %3d ", datasgroup.original_group);
 
@@ -2215,7 +2241,7 @@ void MolfileSaver::_calcRSStereoDescriptor (BaseMolecule &mol, BaseMolecule &unf
 
    mol.stereocenters.get(idx, atom_idx, type, group, pyramid);
 
-   if (type == 0)
+   if (type <= MoleculeStereocenters::ATOM_ANY)
       return;
 
    parity = _getStereocenterParity (mol, atom_idx);

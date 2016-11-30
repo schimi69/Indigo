@@ -606,15 +606,20 @@ CEXPORT int indigoAutomap (int reaction, const char *mode)
       /*
        * Set timeout
        */
-      AutoPtr<TimeoutCancellationHandler> timeout;
+      std::unique_ptr<TimeoutCancellationHandler> timeout(nullptr);
       if(self.aam_cancellation_timeout > 0) {
-         timeout.create(self.aam_cancellation_timeout);
-         ram.cancellation = timeout.get();
+         timeout.reset(new TimeoutCancellationHandler(self.aam_cancellation_timeout));
       }
+      /*
+       * Set cancellation handler
+       */
+      AAMCancellationWrapper aam_timeout(timeout.release());
       /*
        * Launch automap
        */
       ram.automap(nmode);
+      
+      aam_timeout.reset();
       
       return 1;
    }

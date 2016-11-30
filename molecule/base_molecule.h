@@ -144,6 +144,8 @@ public:
 
    int transformSCSRtoFullCTAB ();
    int transformFullCTABtoSCSR (ObjArray<TGroup> &templates);
+   int transformHELMtoSGroups(Array<char> &helm_class, Array<char> &name, Array<char> &code, Array<char> &natreplace,
+       StringPool &r_names);
 
    virtual bool  isRSite (int atom_idx) = 0;
    virtual dword getRSiteBits (int atom_idx) = 0;
@@ -241,11 +243,21 @@ public:
 
    MoleculeTGroups tgroups;
 
+   bool use_scsr_sgroups_only = false;
+   bool remove_scsr_lgrp = false;
+   bool use_scsr_name = false;
+   bool expand_mod_templates = false;
+
    MoleculeRGroups rgroups;
 
    StringPool custom_collections;
  
    Array<char> name;
+
+   Array<int> reaction_atom_mapping;
+   Array<int> reaction_atom_inversion;
+   Array<int> reaction_atom_exact_change;
+   Array<int> reaction_bond_reacting_center;
 
    static bool hasCoord (BaseMolecule &mol);
    static bool hasZCoord (BaseMolecule &mol);
@@ -364,6 +376,7 @@ protected:
 
    int _transformTGroupToSGroup (int idx);
    int _addTemplate (TGroup &tgroup);
+   void _fillTemplateSeqIds ();
 
    Array<int> _hl_atoms;
    Array<int> _hl_bonds;

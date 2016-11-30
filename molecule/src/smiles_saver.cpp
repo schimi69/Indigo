@@ -52,12 +52,12 @@ TL_CP_GET(_ban_slashes),
 TL_CP_GET(_cis_trans_parity)
 {
    vertex_ranks = 0;
-   atom_atom_mapping = 0;
    ignore_hydrogens = false;
    canonize_chiralities = false;
    write_extra_info = true;
    _mol = 0;
    smarts_mode = false;
+   inside_rsmiles = false;
    ignore_invalid_hcount = true;
    separate_rsites = true;
    rsite_indices_as_aam = true;
@@ -502,8 +502,8 @@ void SmilesSaver::_saveMolecule ()
             _output.writeChar('/');
          else if ((dir == 2 && v_idx == edge.end) || (dir == 1 && v_idx == edge.beg))
             _output.writeChar('\\');
-         else if (smarts_mode)
-            _writeSmartsBond(e_idx, &_qmol->getBond(e_idx));
+         else if (smarts_mode && _qmol != 0)
+            _writeSmartsBond(e_idx, &_qmol->getBond(e_idx), false);
          else if (bond_order == BOND_DOUBLE)
             _output.writeChar('=');
          else if (bond_order == BOND_TRIPLE)
@@ -542,8 +542,11 @@ void SmilesSaver::_saveMolecule ()
          if (!smarts_mode)
             _writeAtom(v_idx, _atoms[v_idx].aromatic,
                        _atoms[v_idx].lowercase, _atoms[v_idx].chirality);
-         else
+         else if (_qmol != 0)
             _writeSmartsAtom(v_idx, &_qmol->getAtom(v_idx), _atoms[v_idx].chirality, 0, false);
+         else
+           throw Error("SMARTS format availble for query only");
+
 
          QS_DEF(Array<int>, closing);
 
@@ -777,8 +780,8 @@ void SmilesSaver::_writeAtom (int idx, bool aromatic, bool lowercase, int chiral
       throw Error("undefined atom number");
    }
 
-   if (atom_atom_mapping != 0)
-      aam = atom_atom_mapping[idx];
+   if (inside_rsmiles)
+      aam = _bmol->reaction_atom_mapping[idx];
 
    if (atom_number != ELEM_C && atom_number != ELEM_P &&
        atom_number != ELEM_N && atom_number != ELEM_S &&
@@ -940,13 +943,12 @@ void SmilesSaver::_writeSmartsAtom (int idx, QueryMolecule::Atom *atom, int chir
             else if (hydro == 1)
                _output.printf("H");
          }
-         if (atom_atom_mapping != 0)
-         {
-            int aam = atom_atom_mapping[idx];
 
-            if (aam > 0)
-               _output.printf(":%d", aam);
-         }
+         int aam = _bmol->reaction_atom_mapping[idx];
+
+         if (aam > 0)
+            _output.printf(":%d", aam);
+
          break;
       }
       case QueryMolecule::ATOM_CHARGE:
@@ -999,9 +1001,17 @@ void SmilesSaver::_writeSmartsAtom (int idx, QueryMolecule::Atom *atom, int chir
       _output.writeChar(']');
 }
 
-void SmilesSaver::_writeSmartsBond (int idx, QueryMolecule::Bond *bond) const
+void SmilesSaver::_writeSmartsBond (int idx, QueryMolecule::Bond *bond, bool has_or_parent) const
 {
    int i;
+
+   int qb = QueryMolecule::getQueryBondType(*bond);
+
+   if (qb == QueryMolecule::QUERY_BOND_SINGLE_OR_DOUBLE)
+   {
+      _output.writeString("-,=");
+      return;  
+   }
 
    switch (bond->type)
    {
@@ -1011,7 +1021,7 @@ void SmilesSaver::_writeSmartsBond (int idx, QueryMolecule::Bond *bond) const
       case QueryMolecule::OP_NOT:
       {
          _output.writeChar('!');
-         _writeSmartsBond(idx, (QueryMolecule::Bond *)bond->children[0]);
+         _writeSmartsBond(idx, (QueryMolecule::Bond *)bond->children[0], has_or_parent);
          break;
       }
       case QueryMolecule::OP_OR:
@@ -1020,7 +1030,17 @@ void SmilesSaver::_writeSmartsBond (int idx, QueryMolecule::Bond *bond) const
          {
             if (i > 0)
                _output.printf(",");
-            _writeSmartsBond(idx, (QueryMolecule::Bond *)bond->children[i]);
+            _writeSmartsBond(idx, (QueryMolecule::Bond *)bond->children[i], true);
+         }
+         break;
+      }
+      case QueryMolecule::OP_AND:
+      {
+         for (i = 0; i < bond->children.size(); i++)
+         {
+            if (i > 0)
+               _output.writeChar(has_or_parent ? '&' : ';');
+            _writeSmartsBond(idx, (QueryMolecule::Bond *)bond->children[i], has_or_parent);
          }
          break;
       }

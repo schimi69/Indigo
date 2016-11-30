@@ -1,5 +1,5 @@
 /****************************************************************************
- * Copyright (C) 2011 EPAM Systems
+ * Copyright (C) 2011, 2016 EPAM Systems
  *
  * This file is part of Indigo toolkit.
  *
@@ -36,6 +36,7 @@ public interface IndigoLib extends Library
    int indigoSetOptionFloat (String name, float value);
    int indigoSetOptionColor (String name, float r, float g, float b);
    int indigoSetOptionXY (String name, int x, int y);
+   int indigoResetOption ();
 
    int indigoReadFile (String filename);
    int indigoLoadString (String str);
@@ -164,6 +165,8 @@ public interface IndigoLib extends Library
    int indigoAtomicNumber (int atom);
    int indigoIsotope (int atom);
    int indigoValence (int atom);
+   int indigoCheckValence (int atom);
+   int indigoCheckQuery (int item);
    int indigoCountHydrogens (int atom, IntByReference valence);
    int indigoCountImplicitHydrogens (int item);
 
@@ -314,9 +317,9 @@ public interface IndigoLib extends Library
 
    int   indigoCountHeavyAtoms (int molecule);
    int   indigoGrossFormula    (int molecule);
-   float indigoMolecularWeight (int molecule);
-   float indigoMostAbundantMass (int molecule);
-   float indigoMonoisotopicMass (int molecule);
+   double indigoMolecularWeight (int molecule);
+   double indigoMostAbundantMass (int molecule);
+   double indigoMonoisotopicMass (int molecule);
 
    Pointer indigoCanonicalSmiles (int molecule);
    Pointer indigoLayeredCode (int molecule);
@@ -344,6 +347,9 @@ public interface IndigoLib extends Library
    int indigoLayout (int object);
 
    Pointer indigoSmiles (int item);
+
+   Pointer indigoSmarts (int item);
+   Pointer indigoCanonicalSmarts (int item);
 
    int indigoExactMatch (int item1, int item2, String flags);
 
@@ -439,6 +445,12 @@ public interface IndigoLib extends Library
 
    int indigoExpandAbbreviations (int structure);
    int indigoIterateTautomers(int structure, String params);
+   
+   int indigoNameToStructure(String name, String params);
+
+   int indigoTransformHELMtoSCSR(int item);
+
+   int indigoResetOptions();
 
    int indigoDbgBreakpoint ();
    Pointer indigoDbgInternalType (int object);

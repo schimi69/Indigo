@@ -1,5 +1,5 @@
 /****************************************************************************
- * Copyright (C) 2009-2015 EPAM Systems
+ * Copyright (C) 2009-2016 EPAM Systems
  *
  * This file is part of Indigo toolkit.
  *
@@ -99,6 +99,12 @@ public class Indigo {
     }
 
     static public float checkResultFloat(Object obj, float result) {
+        if (result < 0)
+            throw new IndigoException(obj, _lib.indigoGetLastError());
+        return result;
+    }
+
+    static public double checkResultDouble(Object obj, double result) {
         if (result < 0)
             throw new IndigoException(obj, _lib.indigoGetLastError());
         return result;
@@ -264,34 +270,6 @@ public class Indigo {
             _lib = (IndigoLib) Native.loadLibrary(getPathToBinary(path, "libindigo.dylib"), IndigoLib.class);
         else // _os == OS_WINDOWS
         {
-            if ((new File(getPathToBinary(path, "msvcr100.dll"))).exists()) {
-                try {
-                    System.load(getPathToBinary(path, "msvcr100.dll"));
-                } catch (UnsatisfiedLinkError e) {
-                    // File could have been already loaded
-                }
-            }
-            if ((new File(getPathToBinary(path, "msvcp100.dll"))).exists()) {
-                try {
-                    System.load(getPathToBinary(path, "msvcp100.dll"));
-                } catch (UnsatisfiedLinkError e) {
-                    // File could have been already loaded
-                }
-            }
-            if ((new File(getPathToBinary(path, "msvcr110.dll"))).exists()) {
-                try {
-                    System.load(getPathToBinary(path, "msvcr110.dll"));
-                } catch (UnsatisfiedLinkError e) {
-                    // File could have been already loaded
-                }
-            }
-            if ((new File(getPathToBinary(path, "msvcp110.dll"))).exists()) {
-                try {
-                    System.load(getPathToBinary(path, "msvcp110.dll"));
-                } catch (UnsatisfiedLinkError e) {
-                    // File could have been already loaded
-                }
-            }
             if ((new File(getPathToBinary(path, "msvcr120.dll"))).exists()) {
                 try {
                     System.load(getPathToBinary(path, "msvcr120.dll"));
@@ -302,6 +280,20 @@ public class Indigo {
             if ((new File(getPathToBinary(path, "msvcp120.dll"))).exists()) {
                 try {
                     System.load(getPathToBinary(path, "msvcp120.dll"));
+                } catch (UnsatisfiedLinkError e) {
+                    // File could have been already loaded
+                }
+            }
+            if ((new File(getPathToBinary(path, "vcruntime140.dll"))).exists()) {
+                try {
+                    System.load(getPathToBinary(path, "vcruntime140.dll"));
+                } catch (UnsatisfiedLinkError e) {
+                    // File could have been already loaded
+                }
+            }
+            if ((new File(getPathToBinary(path, "msvcp140.dll"))).exists()) {
+                try {
+                    System.load(getPathToBinary(path, "msvcp140.dll"));
                 } catch (UnsatisfiedLinkError e) {
                     // File could have been already loaded
                 }
@@ -444,6 +436,11 @@ public class Indigo {
         checkResult(this, _lib.indigoSetOptionFloat(option, (float) value));
     }
 
+    public void resetOptions() {
+        setSessionID();
+        checkResult(this, _lib.indigoResetOptions());
+    }
+
     public IndigoObject writeFile(String filename) {
         setSessionID();
         return new IndigoObject(this, checkResult(this, _lib.indigoWriteFile(filename)));
@@ -565,11 +562,11 @@ public class Indigo {
     }
 
     public IndigoObject exactMatch(IndigoObject obj1, IndigoObject obj2, String flags) {
-        setSessionID();
         if (flags == null)
             flags = "";
 
         IndigoObject[] parent = new IndigoObject[]{obj1, obj2};
+        setSessionID();
         int match = checkResult(this, parent, _lib.indigoExactMatch(obj1.self, obj2.self, flags));
 
         if (match == 0)
@@ -604,14 +601,14 @@ public class Indigo {
     public float similarity(IndigoObject obj1, IndigoObject obj2, String metrics) {
         if (metrics == null)
             metrics = "";
-        setSessionID();
         Object[] guard = new Object[]{this, obj1, obj2};
+        setSessionID();
         return checkResultFloat(guard, _lib.indigoSimilarity(obj1.self, obj2.self, metrics));
     }
 
     public int commonBits(IndigoObject fingerprint1, IndigoObject fingerprint2) {
-        setSessionID();
         Object[] guard = new Object[]{this, fingerprint1, fingerprint2};
+        setSessionID();
         return checkResult(guard, _lib.indigoCommonBits(fingerprint1.self, fingerprint2.self));
     }
 
@@ -665,8 +662,7 @@ public class Indigo {
 
     public IndigoObject extractCommonScaffold(IndigoObject structures, String options) {
         setSessionID();
-        int res = checkResult(this, structures,
-                _lib.indigoExtractCommonScaffold(structures.self, options));
+        int res = checkResult(this, structures, _lib.indigoExtractCommonScaffold(structures.self, options));
 
         if (res == 0)
             return null;
@@ -683,8 +679,8 @@ public class Indigo {
      */
     @Deprecated
     public IndigoObject decomposeMolecules(IndigoObject scaffold, IndigoObject structures) {
-        setSessionID();
         Object[] guard = new Object[]{this, scaffold, structures};
+        setSessionID();
         int res = checkResult(guard, _lib.indigoDecomposeMolecules(scaffold.self, structures.self));
 
         if (res == 0)
@@ -702,8 +698,8 @@ public class Indigo {
     }
 
     public IndigoObject createDecomposer(IndigoObject scaffold) {
-        setSessionID();
         Object[] guard = new Object[]{this, scaffold};
+        setSessionID();
         int res = checkResult(guard, _lib.indigoCreateDecomposer(scaffold.self));
 
         if (res == 0)
@@ -713,8 +709,8 @@ public class Indigo {
     }
 
     public IndigoObject reactionProductEnumerate(IndigoObject reaction, IndigoObject monomers) {
-        setSessionID();
         Object[] guard = new Object[]{this, reaction, monomers};
+        setSessionID();
         int res = checkResult(guard, _lib.indigoReactionProductEnumerate(reaction.self, monomers.self));
 
         if (res == 0)
@@ -724,7 +720,6 @@ public class Indigo {
     }
 
     public IndigoObject reactionProductEnumerate(IndigoObject reaction, Iterable<Iterable> monomers) {
-        setSessionID();
         Object[] guard = new Object[]{this, reaction, monomers};
 
         IndigoObject monomersArrayArray = createArray();
@@ -735,7 +730,7 @@ public class Indigo {
             }
             monomersArrayArray.arrayAdd(monomersArray);
         }
-
+        setSessionID();
         int res = checkResult(guard, _lib.indigoReactionProductEnumerate(reaction.self, monomersArrayArray.self));
         if (res == 0)
             return null;
@@ -744,8 +739,8 @@ public class Indigo {
     }
 
     public void transform(IndigoObject reaction, IndigoObject monomer) {
-        setSessionID();
         Object[] guard = new Object[]{this, reaction, monomer};
+        setSessionID();
         checkResult(guard, _lib.indigoTransform(reaction.self, monomer.self));
     }
 
@@ -766,7 +761,6 @@ public class Indigo {
 
     public IndigoObject toIndigoArray(Collection<IndigoObject> coll) {
         setSessionID();
-
         IndigoObject arr = createArray();
         for (IndigoObject obj : coll)
             arr.arrayAdd(obj);
@@ -848,6 +842,24 @@ public class Indigo {
     public int buildPkaModel(int level, float threshold, String filename) {
         setSessionID();
         return checkResult(this, _lib.indigoBuildPkaModel(level, threshold, filename));
+    }
+
+    public IndigoObject nameToStructure(String name, String params) {
+        setSessionID();
+        int result = checkResult(this, _lib.indigoNameToStructure(name, params));
+        if(result == 0)
+            return null;
+
+        return new IndigoObject(this, result);
+    }
+
+    public IndigoObject transformHELMtoSCSR(IndigoObject item) {
+        setSessionId()
+        int result = checkResult(this, _lib.indigoTransformHELMtoSCSR(item.self))
+        if (result == 0)
+            return null;
+
+        return new IndigoObject(this, result);
     }
 
     @Override

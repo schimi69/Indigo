@@ -33,9 +33,9 @@ void TGroup::clear()
 
 int TGroup::cmp (TGroup &tg1, TGroup &tg2, void *context)
 {
-   if (tg1.fragment == 0)
+   if (tg1.fragment.get() == 0)
       return -1;
-   if (tg2.fragment == 0)
+   if (tg2.fragment.get() == 0)
       return 1;
 
    return tg2.fragment->vertexCount() - tg1.fragment->vertexCount();
@@ -47,20 +47,24 @@ void TGroup::copy (TGroup &other)
    tgroup_name.copy(other.tgroup_name);
    tgroup_alias.copy(other.tgroup_alias);
    tgroup_comment.copy(other.tgroup_comment);
+   tgroup_natreplace.copy(other.tgroup_natreplace);
    tgroup_id = other.tgroup_id;
 
-   fragment = other.fragment->neu();
-   fragment->clone(*other.fragment, 0, 0);
+   AutoPtr<BaseMolecule> new_fragment(other.fragment->neu());
+   fragment.reset(new_fragment.release());
+   fragment->clone(*other.fragment.get(), 0, 0);
 }
 
 IMPL_ERROR(MoleculeTGroups, "molecule tgroups");
 
 MoleculeTGroups::MoleculeTGroups ()
 {
+   _tgroups.clear();
 }
 
 MoleculeTGroups::~MoleculeTGroups ()
 {
+   _tgroups.clear();
 }
 
 void MoleculeTGroups::clear ()
@@ -118,9 +122,11 @@ int MoleculeTGroups::findTGroup (const char *name)
    for (int i = _tgroups.begin(); i != _tgroups.end(); i = _tgroups.next(i))
    {
       TGroup &tgroup = *_tgroups.at(i);
-      BufferScanner sc(tgroup.tgroup_name);
-      if (sc.findWordIgnoreCase(name))
-         return i;
+      if (tgroup.tgroup_name.size() > 0 && name != 0)
+      {
+         if (strncmp(tgroup.tgroup_name.ptr(), name, tgroup.tgroup_name.size()) == 0) 
+            return i;
+      }
    }
    return -1;
 }

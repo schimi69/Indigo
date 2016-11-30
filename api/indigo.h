@@ -91,6 +91,7 @@ CEXPORT int indigoSetOptionBool (const char *name, int value);
 CEXPORT int indigoSetOptionFloat (const char *name, float value);
 CEXPORT int indigoSetOptionColor (const char *name, float r, float g, float b);
 CEXPORT int indigoSetOptionXY (const char *name, int x, int y);
+CEXPORT int indigoResetOptions ();
 
 /* Basic input-output */
 
@@ -190,6 +191,15 @@ CEXPORT const char * indigoCdxml (int object);
 // the output must be a file or a buffer, but not a string
 // (because MDLCT data usually contains zeroes)
 CEXPORT int indigoSaveMDLCT (int item, int output);
+
+/*
+Converts a chemical name into a corresponding structure
+Returns -1 if parsing fails or no structure is found
+Parameters:
+   name - a name to parse
+   params - a string containing parsing options or nullptr if no options are changed
+*/
+CEXPORT int indigoNameToStructure(const char* name, const char* params);
 
 /* Reactions, query reactions */
 /*
@@ -328,6 +338,8 @@ CEXPORT int indigoIterateStereocenters (int molecule);
 CEXPORT int indigoIterateAlleneCenters (int molecule);
 CEXPORT int indigoIterateRGroups (int molecule);
 
+CEXPORT int indigoCountRGroups(int molecule);
+
 CEXPORT int indigoIsPseudoatom (int atom);
 CEXPORT int indigoIsRSite (int atom);
 
@@ -372,6 +384,11 @@ CEXPORT int indigoAtomicNumber (int atom);
 CEXPORT int indigoIsotope (int atom);
 // Not applicable to query molecules.
 CEXPORT int indigoValence (int atom);
+// Returns zero if valence of the atom is wrong
+CEXPORT int indigoCheckValence (int atom);
+
+// Returns one if atom or bond belongs Query or has any query feature
+CEXPORT int indigoCheckQuery (int item);
 
 // Applicable to atoms, query atoms, and molecules. Can fail
 // (return zero) on query atoms where the number of hydrogens
@@ -443,8 +460,11 @@ CEXPORT int indigoSetSGroupDisplayOption (int sgroup, int option);
 CEXPORT int indigoGetSGroupMultiplier (int sgroup);
 CEXPORT int indigoSetSGroupMultiplier (int sgroup, int multiplier);
 
+CEXPORT const char * indigoGetRepeatingUnitSubscript (int sgroup);
+CEXPORT int indigoGetRepeatingUnitConnectivity (int sgroup);
+
 CEXPORT int indigoSetSGroupBrackets (int sgroup, int brk_style, float x1, float y1, float x2, float y2,
-                                     float x3, float y3, float x4, float y4);    
+                                     float x3, float y3, float x4, float y4);
 
 CEXPORT int indigoFindSGroups (int item, const char *property, const char *value);
 
@@ -582,9 +602,9 @@ CEXPORT int indigoIterateEdgeSubmolecules (int molecule, int min_bonds, int max_
 
 CEXPORT int   indigoCountHeavyAtoms (int molecule);
 CEXPORT int   indigoGrossFormula    (int molecule);
-CEXPORT float indigoMolecularWeight (int molecule);
-CEXPORT float indigoMostAbundantMass (int molecule);
-CEXPORT float indigoMonoisotopicMass (int molecule);
+CEXPORT double indigoMolecularWeight (int molecule);
+CEXPORT double indigoMostAbundantMass (int molecule);
+CEXPORT double indigoMonoisotopicMass (int molecule);
 CEXPORT const char * indigoMassComposition (int molecule);
 
 CEXPORT const char * indigoCanonicalSmiles (int molecule);
@@ -625,6 +645,8 @@ CEXPORT int indigoLayout(int object);
 CEXPORT int indigoClean2d(int object);
 
 CEXPORT const char * indigoSmiles (int item);
+CEXPORT const char * indigoSmarts (int item);
+CEXPORT const char * indigoCanonicalSmarts (int item);
 
 // Returns a "mapping" if there is an exact match, zero otherwise
 // The flags string consists of space-separated flags.
@@ -909,6 +931,9 @@ CEXPORT int indigoToBuffer (int handle, char **buf, int *size);
 CEXPORT int indigoReactionProductEnumerate (int reaction, int monomers);
 
 CEXPORT int indigoTransform (int reaction, int monomers);
+
+
+CEXPORT int indigoTransformHELMtoSCSR (int monomer);
 
 /* Debug functionality */
 

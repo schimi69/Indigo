@@ -1,4 +1,5 @@
-﻿using System;
+﻿
+using System;
 using System.Collections.Generic;
 using System.Text;
 namespace com.epam.indigo
@@ -21,6 +22,7 @@ namespace com.epam.indigo
         int indigoSetOptionFloat(string name, float value);
         int indigoSetOptionColor(string name, float r, float g, float b);
         int indigoSetOptionXY(string name, int x, int y);
+        int indigoResetOptions();
 
         int indigoReadFile(string filename);
         int indigoReadString(string str);
@@ -131,6 +133,8 @@ namespace com.epam.indigo
         int indigoAtomicNumber(int atom);
         int indigoIsotope(int atom);
         int indigoValence(int atom);
+        int indigoCheckValence(int atom);
+        int indigoCheckQuery(int item);
         int indigoCountHydrogens(int atom, int* hydro);
         int indigoCountImplicitHydrogens(int item);
 
@@ -266,9 +270,9 @@ namespace com.epam.indigo
 
         int indigoCountHeavyAtoms(int molecule);
         int indigoGrossFormula(int molecule);
-        float indigoMolecularWeight(int molecule);
-        float indigoMostAbundantMass(int molecule);
-        float indigoMonoisotopicMass(int molecule);
+        double indigoMolecularWeight(int molecule);
+        double indigoMostAbundantMass(int molecule);
+        double indigoMonoisotopicMass(int molecule);
         sbyte* indigoCanonicalSmiles(int molecule);
         sbyte* indigoLayeredCode(int molecule);
         int indigoHasCoord(int molecule);
@@ -290,6 +294,8 @@ namespace com.epam.indigo
         int indigoUnfoldHydrogens(int item);
         int indigoLayout(int item);
         sbyte* indigoSmiles(int item);
+        sbyte* indigoSmarts(int item);
+        sbyte* indigoCanonicalSmarts(int item);
         int indigoExactMatch(int item1, int item2, string flags);
         int indigoSetTautomerRule(int id, string beg, string end);
         int indigoRemoveTautomerRule(int id);
@@ -380,6 +386,10 @@ namespace com.epam.indigo
 
         int indigoExpandAbbreviations (int structure);
         int indigoIterateTautomers(int structure, string parameters);
+
+        int indigoNameToStructure(string name, string parameters);
+
+        int indigoTransformHELMtoSCSR(int item);
 
         sbyte* indigoDbgInternalType(int item);
         sbyte* indigoDbgProfiling (int whole_sessoin);

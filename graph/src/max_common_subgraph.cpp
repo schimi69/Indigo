@@ -34,6 +34,7 @@ MaxCommonSubgraph::MaxCommonSubgraph(Graph &subgraph, Graph &supergraph) :
    parametersForExact.isStopped = false;
    parametersForExact.maxIteration = -1;
    parametersForExact.numberOfSolutions = 0;
+   parametersForExact.throw_error_for_incorrect_map = false;
 
    parametersForApproximate.error = 0;
    parametersForApproximate.maxIteration = 1000;
@@ -240,7 +241,7 @@ MaxCommonSubgraph::ReCreation::ReCreation(ReGraph &rgr, MaxCommonSubgraph& conte
 
 void MaxCommonSubgraph::ReCreation::createRegraph(){
    _regraph.clear();
-    if (_regraph.cancellation_handler != 0) {
+    if (_regraph.cancellation_handler != nullptr) {
         if (_regraph.cancellation_handler->isCancelled())
             throw Error("mcs search was cancelled: %s", _regraph.cancellation_handler->cancelledRequestMessage());
     }
@@ -433,7 +434,9 @@ bool MaxCommonSubgraph::ReCreation::insertSolution(const Array<int>& mapping){
             if(a != -1 && b != -1){
                c = _regraph.getPointIndex(a, b);
                if(c == -1){
-                  throw Error("input mapping incorrect");
+                   if (_context.parametersForExact.throw_error_for_incorrect_map) {
+                      throw Error("input mapping incorrect");
+                   }
                } else {
                   solution.set(c);
                   solution_g1.set(_regraph.getPoint(c)->getid1());
@@ -574,7 +577,7 @@ void MaxCommonSubgraph::ReCreation::getSolutionListsSuper(ObjArray< Array<int> >
 MaxCommonSubgraph::ReGraph::ReGraph():
    cbEmbedding(0),
    userdata(0),
-   cancellation_handler(0),
+   cancellation_handler(nullptr),
    _nbIteration(0), 
    _maxIteration(-1),
    _firstGraphSize(0), 
@@ -588,7 +591,7 @@ MaxCommonSubgraph::ReGraph::ReGraph():
 MaxCommonSubgraph::ReGraph::ReGraph(MaxCommonSubgraph& context):
 cbEmbedding(0),
    userdata(0),
-   cancellation_handler(0),
+   cancellation_handler(nullptr),
    _nbIteration(0),
    _maxIteration(-1),
    _firstGraphSize(0),
@@ -702,7 +705,7 @@ void MaxCommonSubgraph::ReGraph::parse(bool findAllStructure){
                if(_maxIteration > -1 && _nbIteration >= _maxIteration)
                   _stop = true;
                if(_nbIteration % 10 == 0) {
-                  if(cancellation_handler != 0) {
+                  if(cancellation_handler != nullptr) {
                      if(cancellation_handler->isCancelled())
                         throw Error("mcs search was cancelled: %s", cancellation_handler->cancelledRequestMessage());
                   }

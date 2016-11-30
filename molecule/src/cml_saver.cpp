@@ -17,6 +17,7 @@
 #include "molecule/molecule.h"
 #include "molecule/query_molecule.h"
 #include "molecule/elements.h"
+#include "molecule/molecule_savers.h"
 #include "base_cpp/locale_guard.h"
 #include "tinyxml.h"
 
@@ -137,16 +138,16 @@ void CmlSaver::_addMoleculeElement (TiXmlElement *elem, BaseMolecule &mol, bool 
          atom->SetAttribute("id", buf.ptr());
          atom->SetAttribute("elementType", atom_str);
 
-         if (_mol->getAtomIsotope(i) != 0)
+         if (_mol->getAtomIsotope(i) > 0)
          {
             atom->SetAttribute("isotope", _mol->getAtomIsotope(i));
             // for inchi-1 program which ignores "isotope" property (version 1.03)
             atom->SetAttribute("isotopeNumber", _mol->getAtomIsotope(i));
          }
 
-         if (_mol->getAtomCharge(i) != 0)
+         int charge = _mol->getAtomCharge(i);
+         if ((mol.isQueryMolecule() && charge != CHARGE_UNKNOWN) || (!mol.isQueryMolecule() && charge != 0))
             atom->SetAttribute("formalCharge", _mol->getAtomCharge(i));
-
 
          if (!_mol->isRSite(i) && !_mol->isPseudoAtom(i))
          {
@@ -181,6 +182,20 @@ void CmlSaver::_addMoleculeElement (TiXmlElement *elem, BaseMolecule &mol, bool 
       
                   if (hcount >= 0)
                      atom->SetAttribute("hydrogenCount", hcount);
+               }
+            }
+
+            for (int j = _mol->sgroups.begin(); j != _mol->sgroups.end(); j = _mol->sgroups.next(j))
+            {
+               SGroup &sgroup = _mol->sgroups.getSGroup(j);
+               if (sgroup.sgroup_type == SGroup::SG_TYPE_DAT)
+               {
+                  DataSGroup &dsg = (DataSGroup &)sgroup;
+                  if ( (dsg.name.size() >= 12) && (strncmp(dsg.name.ptr(), "INDIGO_ALIAS", 12) == 0) &&
+                       (dsg.atoms.size() > 0) && (dsg.atoms[0] == i) && dsg.data.size() > 0)
+                  {
+                     atom->SetAttribute("mrvAlias", dsg.data.ptr());
+                  }
                }
             }
          }
@@ -256,7 +271,14 @@ void CmlSaver::_addMoleculeElement (TiXmlElement *elem, BaseMolecule &mol, bool 
 
             int unsat;
             if (qmol->getAtom(i).sureValue(QueryMolecule::ATOM_UNSATURATION, unsat))
-               out.printf("u1");
+               out.printf("u1;");
+
+            int hcount = MoleculeSavers::getHCount(mol, i, atom_number, charge);
+      
+            if (hcount > 0)
+               out.printf("H%d", hcount);
+            else if (hcount == 0)
+               out.printf("H0");
 
             if (buf.size() > 0)
             {
@@ -278,7 +300,7 @@ void CmlSaver::_addMoleculeElement (TiXmlElement *elem, BaseMolecule &mol, bool 
                      val |= 1 << (idx - 1);
                      break;
                   }
-               }
+               } 
             }
    
             if (val > 0)
@@ -324,6 +346,25 @@ void CmlSaver::_addMoleculeElement (TiXmlElement *elem, BaseMolecule &mol, bool 
 
             atomparity->LinkEndChild(new TiXmlText("1"));
          }
+        
+         if (_mol->reaction_atom_mapping[i] > 0)
+         {
+            atom->SetAttribute("mrvMap", _mol->reaction_atom_mapping[i]);
+         }
+
+         if (_mol->reaction_atom_inversion[i] > 0)
+         {
+            if (_mol->reaction_atom_inversion[i] == 1)
+              atom->SetAttribute("reactionStereo", "Inv");
+            else if (_mol->reaction_atom_inversion[i] == 2)
+              atom->SetAttribute("reactionStereo", "Ret");
+         }
+
+         if (_mol->reaction_atom_exact_change[i] > 0)
+         {
+            atom->SetAttribute("exactChange", "1");
+         }
+
       }
 
       int latest_ind = i;
@@ -405,6 +446,15 @@ void CmlSaver::_addMoleculeElement (TiXmlElement *elem, BaseMolecule &mol, bool 
                bond->SetAttribute("queryType", "DA");
             else if (qb == QueryMolecule::QUERY_BOND_ANY)
                bond->SetAttribute("queryType", "Any");
+
+            int indigo_topology = -1;
+            if (qmol != 0)
+               qmol->getBond(i).sureValue(QueryMolecule::BOND_TOPOLOGY, indigo_topology);
+      
+            if (indigo_topology == TOPOLOGY_RING)
+               bond->SetAttribute("topology", "ring");
+            else if (indigo_topology == TOPOLOGY_CHAIN)
+               bond->SetAttribute("topology", "chain");
          }
 
          int dir = _mol->getBondDirection(i);
@@ -430,16 +480,33 @@ void CmlSaver::_addMoleculeElement (TiXmlElement *elem, BaseMolecule &mol, bool 
             bondstereo->SetAttribute("atomRefs4", buf.ptr());
             bondstereo->LinkEndChild(new TiXmlText((parity == MoleculeCisTrans::CIS) ? "C" : "T"));
          }
+         else if (_mol->cis_trans.isIgnored(i))
+         {
+            TiXmlElement * bondstereo = new TiXmlElement("bondStereo");
+            bond->LinkEndChild(bondstereo);
+            bondstereo->SetAttribute("convention", "MDL");
+            bondstereo->SetAttribute("conventionValue", "3");
+         }
+
+         if (_mol->reaction_bond_reacting_center[i] != 0)
+         {
+            bond->SetAttribute("mrvReactingCenter", _mol->reaction_bond_reacting_center[i]);
+         }
       }
    }
 
    if (_mol->countSGroups() > 0)
    {
-      MoleculeSGroups *sgroups = &_mol->sgroups;
-
       for (i = _mol->sgroups.begin(); i != _mol->sgroups.end(); i = _mol->sgroups.next(i))
       {
-         SGroup &sgroup = sgroups->getSGroup(i);
+         SGroup &sgroup = _mol->sgroups.getSGroup(i);
+
+         if (sgroup.sgroup_type == SGroup::SG_TYPE_DAT)
+         {
+            DataSGroup &dsg = (DataSGroup &)sgroup;
+            if ( (dsg.name.size() >= 12) && (strncmp(dsg.name.ptr(), "INDIGO_ALIAS", 12) == 0) )
+               continue;
+         }
 
          if (sgroup.parent_group == 0)
             _addSgroupElement(molecule, *_mol, sgroup);
@@ -688,10 +755,12 @@ void CmlSaver::_addRgroups (TiXmlElement *elem, BaseMolecule &mol, bool query)
             continue;
 
          TiXmlElement * rg = new TiXmlElement("Rgroup");
-         elem->LinkEndChild(rg);
+         if (elem == 0)
+            _doc->LinkEndChild(rg);
+         else
+            elem->LinkEndChild(rg);
 
          rg->SetAttribute("rgroupID", i);
-
 
          if (rgroup.if_then > 0)
             rg->SetAttribute("thenR", rgroup.if_then);
@@ -743,6 +812,7 @@ void CmlSaver::_writeOccurrenceRanges (Output &out, const Array<int> &occurrence
       if (i != occurrences.size() - 1)
          out.printf(",");
    }
+   out.writeChar(0);
 }
 
 bool CmlSaver::_getRingBondCountFlagValue (QueryMolecule &qmol, int idx, int &value)

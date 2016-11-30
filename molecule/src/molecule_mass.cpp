@@ -21,13 +21,20 @@
 
 using namespace indigo;
 
+IMPL_ERROR(MoleculeMass, "mass");
+
 MoleculeMass::MoleculeMass()
 {
    relative_atomic_mass_map = NULL;
 }
 
-float MoleculeMass::molecularWeight (Molecule &mol)
+double MoleculeMass::molecularWeight (Molecule &mol)
 {
+   if (mol.sgroups.getSGroupCount(SGroup::SG_TYPE_SRU) > 0)
+   {
+       throw Error("Cannot calculate mass for structure with repeating units");
+   }
+    
    mol.restoreAromaticHydrogens();
 
    double molmass = 0;
@@ -40,7 +47,14 @@ float MoleculeMass::molecularWeight (Molecule &mol)
    {
       if (mol.isPseudoAtom(v) || mol.isRSite(v) || mol.isTemplateAtom(v))
       {
-         continue;
+        if (mass_options.skip_error_on_pseudoatoms)
+        {
+          continue;
+        }
+        else
+        {
+          throw Error("Cannot calculate mass for structure with pseudoatoms, template atoms or RSites");
+        }
       }
 
       int number = mol.getAtomNumber(v);
@@ -49,7 +63,7 @@ float MoleculeMass::molecularWeight (Molecule &mol)
 
       if (isotope == 0)
       {
-         float *value = 0;
+         double *value = 0;
          if (relative_atomic_mass_map != NULL)
          {
             value = relative_atomic_mass_map->at2(number);
@@ -84,13 +98,13 @@ float MoleculeMass::molecularWeight (Molecule &mol)
 
    molmass += Element::getStandardAtomicWeight(ELEM_H) * impl_h;
 
-   return (float)molmass;
+   return molmass;
 }
 
 static int _isotopesCmp (int i1, int i2, void *context)
 {
    int element = *(int *)context;
-   float c1, c2;
+   double c1, c2;
    Element::getIsotopicComposition(element, i1, c1);
    Element::getIsotopicComposition(element, i2, c2);
    if (c1 < c2)
@@ -100,8 +114,13 @@ static int _isotopesCmp (int i1, int i2, void *context)
    return 0;
 }
 
-float MoleculeMass::mostAbundantMass (Molecule &mol)
+double MoleculeMass::mostAbundantMass (Molecule &mol)
 {
+   if (mol.sgroups.getSGroupCount(SGroup::SG_TYPE_SRU) > 0)
+   {
+      throw Error("Cannot calculate mass for structure with repeating units");
+   }
+    
    mol.restoreAromaticHydrogens();
 
    double molmass = 0;
@@ -113,8 +132,17 @@ float MoleculeMass::mostAbundantMass (Molecule &mol)
             v != mol.vertexEnd(); 
             v = mol.vertexNext(v))
    {
-      if (mol.isPseudoAtom(v) || mol.isTemplateAtom(v))
-         continue;
+      if (mol.isPseudoAtom(v) || mol.isTemplateAtom(v) || mol.isRSite(v))
+      {        
+        if (mass_options.skip_error_on_pseudoatoms)
+        {
+          continue;
+        }
+        else
+        {
+          throw Error("Cannot calculate mass for structure with pseudoatoms, template atoms or RSites");
+        }
+      }
 
       int number = mol.getAtomNumber(v);
       int isotope = mol.getAtomIsotope(v);
@@ -146,7 +174,7 @@ float MoleculeMass::mostAbundantMass (Molecule &mol)
       Element::getMinMaxIsotopeIndex(i, min_iso, max_iso);
       for (int j = min_iso; j <= max_iso; j++)
       {
-         float composition;
+         double composition;
          if (!Element::getIsotopicComposition(i, j, composition))
             continue;
          if (composition > 0)
@@ -158,7 +186,7 @@ float MoleculeMass::mostAbundantMass (Molecule &mol)
       {
          int j = isotopes[k];
 
-         float composition;
+         double composition;
          if (!Element::getIsotopicComposition(i, j, composition))
             continue;
 
@@ -178,11 +206,16 @@ float MoleculeMass::mostAbundantMass (Molecule &mol)
       }
    }
 
-   return (float)molmass;
+   return molmass;
 }
 
-float MoleculeMass::monoisotopicMass (Molecule &mol)
+double MoleculeMass::monoisotopicMass (Molecule &mol)
 {
+   if (mol.sgroups.getSGroupCount(SGroup::SG_TYPE_SRU) > 0)
+   {
+      throw Error("Cannot calculate mass for structure with repeating units");
+   }
+    
    mol.restoreAromaticHydrogens();
 
    double molmass = 0;
@@ -191,8 +224,17 @@ float MoleculeMass::monoisotopicMass (Molecule &mol)
             v != mol.vertexEnd(); 
             v = mol.vertexNext(v))
    {
-      if (mol.isPseudoAtom(v) || mol.isTemplateAtom(v))
-         continue;
+      if (mol.isPseudoAtom(v) || mol.isTemplateAtom(v) || mol.isRSite(v))
+      {
+        if (mass_options.skip_error_on_pseudoatoms)
+        {
+          continue;
+        }
+        else
+        {
+          throw Error("Cannot calculate mass for structure with pseudoatoms, template atoms or RSites");
+        }
+      }
 
       int number = mol.getAtomNumber(v);
       int isotope = mol.getAtomIsotope(v);
@@ -207,11 +249,16 @@ float MoleculeMass::monoisotopicMass (Molecule &mol)
       molmass += Element::getRelativeIsotopicMass(ELEM_H, 1) * impl_h;
    } 
 
-   return (float)molmass;
+   return molmass;
 }
 
 int MoleculeMass::nominalMass (Molecule &mol)
 {
+   if (mol.sgroups.getSGroupCount(SGroup::SG_TYPE_SRU) > 0)
+   {
+      throw Error("Cannot calculate mass for structure with repeating units");
+   }
+    
    mol.restoreAromaticHydrogens();
 
    int molmass = 0;
@@ -220,7 +267,7 @@ int MoleculeMass::nominalMass (Molecule &mol)
             v != mol.vertexEnd(); 
             v = mol.vertexNext(v))
    {
-      if (mol.isPseudoAtom(v) || mol.isTemplateAtom(v))
+      if (mol.isPseudoAtom(v) || mol.isTemplateAtom(v) || mol.isRSite(v))
          continue;  
 
       int number = mol.getAtomNumber(v);
@@ -246,18 +293,31 @@ int MoleculeMass::_cmp (_ElemCounter &ec1, _ElemCounter &ec2, void *context)
     if (ec2.weight == 0)
         return -1;
     
-    if (ec2.elem == ELEM_H) // move hydrogen to the end
-        return -1;
-    if (ec1.elem == ELEM_H)
+    // carbon has the highest priority
+    if (ec2.elem == ELEM_C)
         return 1;
+    if (ec1.elem == ELEM_C)
+        return -1;
     
-    return ec1.elem - ec2.elem;
+    // hydrogen has the highest priority after carbon
+    if (ec2.elem == ELEM_H)
+        return 1;
+    if (ec1.elem == ELEM_H)
+        return -1;
+
+    // all elements are compared lexicographically
+    return strncmp(Element::toString(ec1.elem), Element::toString(ec2.elem), 3);
 }
 
 
 void MoleculeMass::massComposition (Molecule &mol, Array<char> &str)
 {
-    Array<float> relativeMass;
+    if (mol.sgroups.getSGroupCount(SGroup::SG_TYPE_SRU) > 0)
+    {
+        throw Error("Cannot calculate mass for structure with repeating units");
+    }
+    
+    Array<double> relativeMass;
     int impl_h = 0;
     relativeMass.clear_resize(ELEM_MAX);
     relativeMass.zerofill();
@@ -268,10 +328,17 @@ void MoleculeMass::massComposition (Molecule &mol, Array<char> &str)
          v != mol.vertexEnd();
          v = mol.vertexNext(v))
     {
-        if (mol.isPseudoAtom(v) || mol.isTemplateAtom(v))
+      if (mol.isPseudoAtom(v) || mol.isTemplateAtom(v) || mol.isRSite(v))
+      {
+        if (mass_options.skip_error_on_pseudoatoms)
         {
-            continue;
+          continue;
         }
+        else
+        {
+          throw Error("Cannot calculate mass for structure with pseudoatoms, template atoms or RSites");
+        }
+      }
         
         int number = mol.getAtomNumber(v);
         int isotope = mol.getAtomIsotope(v);
@@ -283,7 +350,7 @@ void MoleculeMass::massComposition (Molecule &mol, Array<char> &str)
         }
         else
         {
-            float *value = 0;
+            double *value = 0;
             if (relative_atomic_mass_map != NULL)
             {
                 value = relative_atomic_mass_map->at2(number);
@@ -302,38 +369,40 @@ void MoleculeMass::massComposition (Molecule &mol, Array<char> &str)
     
     relativeMass[ELEM_H] += Element::getStandardAtomicWeight(ELEM_H) * impl_h;
     
-    float totalWeight = molecularWeight(mol);
-    
-    QS_DEF(Array<_ElemCounter>, counters);
-    int i;
-    
-    counters.clear();
-    
-    for (i = ELEM_MIN; i < ELEM_MAX; i++)
-    {
-        _ElemCounter &ec = counters.push();
-        
-        ec.elem = i;
-        ec.weight = (relativeMass[i] / totalWeight) * 100;
-    }
-    
-    counters.qsort(_cmp, 0);
+    double totalWeight = molecularWeight(mol);
     
     ArrayOutput output(str);
-    
-    bool first_written = false;
-    
-    for (i = 0; i < counters.size(); i++)
+    if (totalWeight)
     {
-        if (counters[i].weight == 0)
-            break;
+        QS_DEF(Array<_ElemCounter>, counters);
+        int i;
+    
+        counters.clear();
+    
+        for (i = ELEM_MIN; i < ELEM_MAX; i++)
+        {
+            _ElemCounter &ec = counters.push();
         
-        if (first_written)
-            output.printf(" ");
+            ec.elem = i;
+            ec.weight = (relativeMass[i] / totalWeight) * 100;
+        }
+    
+        counters.qsort(_cmp, 0);
+    
+        bool first_written = false;
+    
+        for (i = 0; i < counters.size(); i++)
+        {
+            if (counters[i].weight == 0)
+                break;
         
-        output.printf(Element::toString(counters[i].elem));
-        output.printf(" %.2f", counters[i].weight);
-        first_written = true;
+            if (first_written)
+                output.printf(" ");
+        
+            output.printf(Element::toString(counters[i].elem));
+            output.printf(" %.2f", counters[i].weight);
+            first_written = true;
+        }
     }
     output.writeChar(0);
 }

@@ -418,6 +418,15 @@ void MoleculeCisTrans::build (int *exclude_bonds)
 
       int *substituents = _bonds[i].substituents;
 
+
+      // Ignore only bonds that can be cis-trans ?
+      // Ignore bonds marked bonds
+      if (exclude_bonds != 0 && exclude_bonds[i])
+      {
+         _bonds[i].ignored = 1;
+         continue;
+      }
+
       bool have_xyz = true;
       // If bond is marked with ignore flag then read this flag 
       // even if coordinates are not valid.
@@ -426,12 +435,6 @@ void MoleculeCisTrans::build (int *exclude_bonds)
       if (!isGeomStereoBond(mol, i, substituents, have_xyz))
          continue;
 
-      // Ignore only bonds that can be cis-trans
-      if (exclude_bonds != 0 && exclude_bonds[i])
-      {
-         _bonds[i].ignored = 1;
-         continue;
-      }
 
       if (!sortSubstituents(mol, substituents, 0))
          continue;
@@ -832,10 +835,11 @@ void MoleculeCisTrans::flipBond (int atom_parent, int atom_from, int atom_to)
 {
    BaseMolecule &mol = _getMolecule();
    int parent_edge_index = mol.findEdgeIndex(atom_parent, atom_from);
-   if (parent_edge_index == -1 || getParity(parent_edge_index) != 0)
+   if (parent_edge_index == -1)
+// || getParity(parent_edge_index) != 0)
       // Such call wasn't expected and wasn't implemented
-      throw Error("bond flipping with may cause stereobond destruction. "
-         "Such functionality isn't implemented yet.");
+      throw Error("bond flipping attempt for nonexisting bond. ");
+//         "Such functionality isn't implemented yet.");
 
    const Vertex &parent_vertex = mol.getVertex(atom_parent);
    for (int i = parent_vertex.neiBegin();

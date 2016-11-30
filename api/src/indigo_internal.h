@@ -20,6 +20,8 @@
 #pragma warning(disable:4251)
 #endif
 
+#include <utility>
+
 #include "indigo.h"
 
 #include "base_cpp/exception.h"
@@ -32,6 +34,7 @@
 #include "molecule/molecule_stereocenter_options.h"
 #include "molecule/molecule_standardize_options.h"
 #include "molecule/molecule_ionize.h"
+#include "molecule/molecule_mass_options.h"
 
 
 /* When Indigo internal code is used dynamically the INDIGO_VERSION define 
@@ -74,7 +77,7 @@ public:
       OUTPUT,
       REACTION_ITER,
       REACTION_MOLECULE,
-      GROSS,
+      GROSS_MOLECULE,
       SDF_LOADER,
       SDF_SAVER,
       RDF_MOLECULE,
@@ -150,7 +153,8 @@ public:
       TAUTOMER_ITER,
       TAUTOMER_MOLECULE,
       TGROUP,
-      TGROUPS_ITER
+      TGROUPS_ITER,
+      GROSS_REACTION
    };
 
    int type;
@@ -192,16 +196,28 @@ private:
    IndigoObject (const IndigoObject &);
 };
 
-class IndigoGross : public IndigoObject
+class IndigoMoleculeGross : public IndigoObject
 {
 public:
-   IndigoGross ();
-   virtual ~IndigoGross ();
+   IndigoMoleculeGross ();
+   virtual ~IndigoMoleculeGross ();
 
    virtual void toString (Array<char> &str);
 
-   Array<int> gross;
+    std::pair<ObjArray<Array<char> >, ObjArray<Array<int> > > gross;
 };
+
+class IndigoReactionGross : public IndigoObject
+{
+public:
+   IndigoReactionGross ();
+   virtual ~IndigoReactionGross ();
+
+   virtual void toString (Array<char> &str);
+
+   std::pair<ObjArray<std::pair<ObjArray<Array<char> >, ObjArray<Array<int> > > > , ObjArray<std::pair<ObjArray<Array<char> >, ObjArray<Array<int> > > > > gross;
+};
+
 
 struct DLLEXPORT ProductEnumeratorParams
 {
@@ -266,6 +282,8 @@ public:
    PtrArray<TautomerRule> tautomer_rules;
    
    StereocentersOptions stereochemistry_options;
+   MassOptions mass_options;
+
    bool ignore_noncritical_query_features;
    bool treat_x_as_pseudoatom;
    bool skip_3d_chirality;
@@ -281,6 +299,7 @@ public:
    bool molfile_saving_add_implicit_h;
 
    bool smiles_saving_write_name;
+   bool smiles_saving_smarts_mode;
 
    Encoding filename_encoding;
 
@@ -296,9 +315,8 @@ public:
    int aam_cancellation_timeout; //default is zero - no timeout
 
    int cancellation_timeout; // default is 0 seconds - no timeout
-   TimeoutCancellationHandler timeout_cancellation_handler;
 
-   void resetCancellationHandler ();
+   void updateCancellationHandler ();
 
    void initMolfileSaver (MolfileSaver &saver);
    void initRxnfileSaver (RxnfileSaver &saver);
@@ -338,7 +356,7 @@ private:
 };
 
 #define INDIGO_BEGIN { Indigo &self = indigoGetInstance(); \
-      try { self.error_message.clear(); self.resetCancellationHandler(); 
+      try { self.error_message.clear(); self.updateCancellationHandler(); 
 
 #define INDIGO_END(fail) } \
       catch (Exception &ex)         \

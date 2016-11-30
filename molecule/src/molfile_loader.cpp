@@ -48,10 +48,6 @@ TL_CP_GET(_hcount),
 TL_CP_GET(_sgroup_types),
 TL_CP_GET(_sgroup_mapping)
 {
-   reaction_atom_mapping = 0;
-   reaction_atom_inversion = 0;
-   reaction_atom_exact_change = 0;
-   reaction_bond_reacting_center = 0;
    _rgfile = false;
    treat_x_as_pseudoatom = false;
    skip_3d_chirality = false;
@@ -67,7 +63,7 @@ void MolfileLoader::loadMolecule (Molecule &mol)
    _loadMolecule();
 
    if (mol.stereocenters.size() == 0 && !skip_3d_chirality)
-      mol.stereocenters.buildFrom3dCoordinates();
+      mol.stereocenters.buildFrom3dCoordinates(stereochemistry_options);
 }
 
 void MolfileLoader::loadQueryMolecule (QueryMolecule &mol)
@@ -79,7 +75,7 @@ void MolfileLoader::loadQueryMolecule (QueryMolecule &mol)
    _loadMolecule();
 
    if (mol.stereocenters.size() == 0)
-      mol.stereocenters.buildFrom3dCoordinates();
+      mol.stereocenters.buildFrom3dCoordinates(stereochemistry_options);
 }
 
 void MolfileLoader::_loadMolecule ()
@@ -339,6 +335,11 @@ void MolfileLoader::_readCtab2000 ()
 
          rest.skip(3); // skip atom stereo parity
          _hcount[k] = rest.readIntFix(3);
+
+         if (_hcount[k] > 0 && _qmol == 0)
+            if (!ignore_noncritical_query_features)
+               throw Error("only a query can have H count value");
+
          stereo_care = rest.readIntFix(3);
 
          if (stereo_care > 0 && _qmol == 0)
@@ -433,12 +434,9 @@ void MolfileLoader::_readCtab2000 ()
       if (stereo_care)
          _stereo_care_atoms[idx] = 1;
 
-      if (reaction_atom_mapping != 0)
-         reaction_atom_mapping->at(idx) = aam;
-      if (reaction_atom_inversion != 0)
-         reaction_atom_inversion->at(idx) = irflag;
-      if (reaction_atom_exact_change != 0)
-         reaction_atom_exact_change->at(idx) = ecflag;
+      _bmol->reaction_atom_mapping[idx] = aam;
+      _bmol->reaction_atom_inversion[idx] = irflag;
+      _bmol->reaction_atom_exact_change[idx] = ecflag;
    }
 
    int bond_idx;
@@ -450,6 +448,7 @@ void MolfileLoader::_readCtab2000 ()
       int order = _scanner.readIntFix(3);
       int stereo = _scanner.readIntFix(3);
       int topology = 0;
+      int rcenter = 0;
 
       try
       {
@@ -465,10 +464,7 @@ void MolfileLoader::_readCtab2000 ()
             if (!ignore_noncritical_query_features)
                throw Error("bond topology is allowed only for queries");
 
-         int rcenter = rest.readIntFix(3);
-
-         if (reaction_bond_reacting_center != 0)
-            reaction_bond_reacting_center->at(bond_idx) = rcenter;
+         rcenter = rest.readIntFix(3);
       }
       catch (Scanner::Error &)
       {
@@ -537,6 +533,8 @@ void MolfileLoader::_readCtab2000 ()
          _ignore_cistrans[bond_idx] = 1;
       else if (stereo != 0)
          throw Error("unknown number for bond stereo: %d", stereo);
+
+     _bmol->reaction_bond_reacting_center[bond_idx] = rcenter;
    }
 
    int n_3d_features = -1;
@@ -1150,7 +1148,7 @@ void MolfileLoader::_readCtab2000 ()
                      sgroup.data.pop();
                   while (sgroup.data.size() > len)
                   {
-                     if (isspace(sgroup.data.top()))
+                     if (isspace((unsigned char)sgroup.data.top()))
                         sgroup.data.pop();
                      else
                         break;
@@ -1318,7 +1316,6 @@ void MolfileLoader::_readCtab2000 ()
                      id[3] = 0;
                      throw Error("Undefined Sgroup connectivity: '%s'", id);
                   }
-               }
                   if (id[2] == '\n')
                   {
                      if (n != 0)
@@ -1328,6 +1325,7 @@ void MolfileLoader::_readCtab2000 ()
                         need_skip_line = false;
                   }
                }
+            }
             if (need_skip_line)
                _scanner.skipLine();
          }
@@ -1876,7 +1874,6 @@ void MolfileLoader::_postLoad ()
       }
    }
 
-
    if (_mol != 0)
    {
       int k;
@@ -2136,452 +2133,459 @@ void MolfileLoader::_readCtab3000 ()
 
    _init();
 
+   bool atom_block_exists = true;
+   bool bond_block_exists = true;
+
    _scanner.readLine(str, true);
    if (strncmp(str.ptr(), "M  V30 BEGIN ATOM", 14) != 0)
    {
       if (_atoms_num > 0)
-      throw Error("Error reading ATOM block header");
+         throw Error("Error reading ATOM block header");
+      atom_block_exists = false;
+      
    }
    else
    {
-   for (i = 0; i < _atoms_num; i++)
-   {
-      _readMultiString(str);
-      BufferScanner strscan(str.ptr());
-
-      int &atom_type = _atom_types.push();
-
-      _hcount.push(0);
-
-      atom_type = _ATOM_ELEMENT;
-
-      int isotope = 0;
-      int label = 0;
-      AutoPtr<QueryMolecule::Atom> query_atom;
-
-      strscan.readInt1(); // atom index -- ignored
-
-      QS_DEF(Array<char>, buf);
-
-      strscan.readWord(buf, " [");
-
-      char stopchar = strscan.readChar();
-
-      if (stopchar == '[')
+      for (i = 0; i < _atoms_num; i++)
       {
-         if (_qmol == 0)
-            throw Error("atom list is allowed only for queries");
-
-         if (buf[0] == 0)
-            atom_type = _ATOM_LIST;
-         else if (strcmp(buf.ptr(), "NOT") == 0)
-            atom_type = _ATOM_NOTLIST;
+         _readMultiString(str);
+         BufferScanner strscan(str.ptr());
+   
+         int &atom_type = _atom_types.push();
+   
+         _hcount.push(0);
+   
+         atom_type = _ATOM_ELEMENT;
+   
+         int isotope = 0;
+         int label = 0;
+         AutoPtr<QueryMolecule::Atom> query_atom;
+   
+         strscan.readInt1(); // atom index -- ignored
+   
+         QS_DEF(Array<char>, buf);
+   
+         strscan.readWord(buf, " [");
+   
+         char stopchar = strscan.readChar();
+   
+         if (stopchar == '[')
+         {
+            if (_qmol == 0)
+               throw Error("atom list is allowed only for queries");
+   
+            if (buf[0] == 0)
+               atom_type = _ATOM_LIST;
+            else if (strcmp(buf.ptr(), "NOT") == 0)
+               atom_type = _ATOM_NOTLIST;
+            else
+               throw Error("bad word: %s", buf.ptr());
+   
+            bool was_a = false, was_q = false;
+   
+            while (1)
+            {
+               strscan.readWord(buf, ",]");
+               stopchar = strscan.readChar();
+   
+               if (was_a)
+                  throw Error("'A' inside atom list, if present, must be single");
+               if (was_q)
+                  throw Error("'Q' inside atom list, if present, must be single");
+   
+               if (buf.size() == 2 && buf[0] == 'A')
+               {
+                  was_a = true;
+                  atom_type = _ATOM_A;
+               }
+               else if (buf.size() == 2 && buf[0] == 'Q')
+               {
+                  was_q = true;
+                  atom_type = _ATOM_Q;
+               }
+               else
+               {
+                  _appendQueryAtom(buf.ptr(), query_atom);
+               }
+   
+               if (stopchar == ']')
+                  break;
+            }
+         }
+         else if (buf.size() == 2 && buf[0] == 'D')
+         {
+            label = ELEM_H;
+            isotope = 2;
+         }
+         else if (buf.size() == 2 && buf[0] == 'T')
+         {
+            label = ELEM_H;
+            isotope = 3;
+         }
+         else if (buf.size() == 2 && buf[0] == 'Q')
+         {
+            if (_qmol == 0)
+               throw Error("'Q' atom is allowed only for queries");
+   
+            atom_type = _ATOM_Q;
+         }
+         else if (buf.size() == 2 && buf[0] == 'A')
+         {
+            if (_qmol == 0)
+               throw Error("'A' atom is allowed only for queries");
+   
+            atom_type = _ATOM_A;
+         }
+         else if (buf.size() == 2 && buf[0] == 'X' && !treat_x_as_pseudoatom)
+         {
+            if (_qmol == 0)
+               throw Error("'X' atom is allowed only for queries");
+   
+            atom_type = _ATOM_X;
+         }
+         else if (buf.size() == 3 && buf[0] == 'R' && buf[1] == '#')
+         {
+            atom_type = _ATOM_R;
+            label = ELEM_RSITE;
+         }
          else
-            throw Error("bad word: %s", buf.ptr());
-
-         bool was_a = false, was_q = false;
-
-         while (1)
          {
-            strscan.readWord(buf, ",]");
-            stopchar = strscan.readChar();
-
-            if (was_a)
-               throw Error("'A' inside atom list, if present, must be single");
-            if (was_q)
-               throw Error("'Q' inside atom list, if present, must be single");
-
-            if (buf.size() == 2 && buf[0] == 'A')
+            label = Element::fromString2(buf.ptr());
+   
+            if (label == -1)
             {
-               was_a = true;
-               atom_type = _ATOM_A;
+               int cur_pos = strscan.tell();
+               QS_DEF(ReusableObjArray< Array<char> >, strs);
+               strs.clear();
+               strs.push().readString("CLASS", false);
+               strs.push().readString("SEQID", false);
+               if (strscan.findWord(strs) != -1)
+                  _atom_types[i] = _ATOM_TEMPLATE;
+               else
+                  _atom_types[i] = _ATOM_PSEUDO;
+               strscan.seek(cur_pos, SEEK_SET);
             }
-            else if (buf.size() == 2 && buf[0] == 'Q')
-            {
-               was_q = true;
-               atom_type = _ATOM_Q;
-            }
-            else
-            {
-               _appendQueryAtom(buf.ptr(), query_atom);
-            }
-
-            if (stopchar == ']')
-               break;
          }
-      }
-      else if (buf.size() == 2 && buf[0] == 'D')
-      {
-         label = ELEM_H;
-         isotope = 2;
-      }
-      else if (buf.size() == 2 && buf[0] == 'T')
-      {
-         label = ELEM_H;
-         isotope = 3;
-      }
-      else if (buf.size() == 2 && buf[0] == 'Q')
-      {
-         if (_qmol == 0)
-            throw Error("'Q' atom is allowed only for queries");
-
-         atom_type = _ATOM_Q;
-      }
-      else if (buf.size() == 2 && buf[0] == 'A')
-      {
-         if (_qmol == 0)
-            throw Error("'A' atom is allowed only for queries");
-
-         atom_type = _ATOM_A;
-      }
-      else if (buf.size() == 2 && buf[0] == 'X' && !treat_x_as_pseudoatom)
-      {
-         if (_qmol == 0)
-            throw Error("'X' atom is allowed only for queries");
-
-         atom_type = _ATOM_X;
-      }
-      else if (buf.size() == 3 && buf[0] == 'R' && buf[1] == '#')
-      {
-         atom_type = _ATOM_R;
-         label = ELEM_RSITE;
-      }
-      else
-      {
-         label = Element::fromString2(buf.ptr());
-
-         if (label == -1)
-         {
-            int cur_pos = strscan.tell();
-            QS_DEF(ReusableObjArray< Array<char> >, strs);
-            strs.clear();
-            strs.push().readString("CLASS", false);
-            strs.push().readString("SEQID", false);
-            if (strscan.findWord(strs) != -1)
-               _atom_types[i] = _ATOM_TEMPLATE;
-            else
-               _atom_types[i] = _ATOM_PSEUDO;
-            strscan.seek(cur_pos, SEEK_SET);
-         }
-      }
-
-      strscan.skipSpace();
-      float x = strscan.readFloat();
-      strscan.skipSpace();
-      float y = strscan.readFloat();
-      strscan.skipSpace();
-      float z = strscan.readFloat();
-      strscan.skipSpace();
-      int aamap = strscan.readInt1();
-
-      if (_mol != 0)
-      {
-         _mol->addAtom(label);
-         if (atom_type == _ATOM_PSEUDO)
-         {
-            _preparePseudoAtomLabel(buf);
-            _mol->setPseudoAtom(i, buf.ptr());
-         }
-         else if (atom_type == _ATOM_TEMPLATE)
-         {
-            _preparePseudoAtomLabel(buf);
-            _mol->setTemplateAtom(i, buf.ptr());
-         }
-      }
-      else
-      {
-         if (atom_type == _ATOM_LIST)
-            _qmol->addAtom(query_atom.release());
-         else if (atom_type == _ATOM_NOTLIST)
-            _qmol->addAtom(QueryMolecule::Atom::nicht(query_atom.release()));
-         else if (atom_type == _ATOM_ELEMENT)
-            _qmol->addAtom(new QueryMolecule::Atom(QueryMolecule::ATOM_NUMBER, label));
-         else if (atom_type == _ATOM_PSEUDO)
-            _qmol->addAtom(new QueryMolecule::Atom(QueryMolecule::ATOM_PSEUDO, buf.ptr()));
-         else if (atom_type == _ATOM_TEMPLATE)
-            _qmol->addAtom(new QueryMolecule::Atom(QueryMolecule::ATOM_TEMPLATE, buf.ptr()));
-         else if (atom_type == _ATOM_A)
-            _qmol->addAtom(QueryMolecule::Atom::nicht(
-                        new QueryMolecule::Atom(QueryMolecule::ATOM_NUMBER, ELEM_H)));
-         else if (atom_type == _ATOM_X)
-         {
-            AutoPtr<QueryMolecule::Atom> atom(new QueryMolecule::Atom());
-            
-            atom->type = QueryMolecule::OP_OR;
-            atom->children.add(new QueryMolecule::Atom(QueryMolecule::ATOM_NUMBER, ELEM_F));
-            atom->children.add(new QueryMolecule::Atom(QueryMolecule::ATOM_NUMBER, ELEM_Cl));
-            atom->children.add(new QueryMolecule::Atom(QueryMolecule::ATOM_NUMBER, ELEM_Br));
-            atom->children.add(new QueryMolecule::Atom(QueryMolecule::ATOM_NUMBER, ELEM_I));
-            atom->children.add(new QueryMolecule::Atom(QueryMolecule::ATOM_NUMBER, ELEM_At));
-            _qmol->addAtom(atom.release());
-         }
-         else if (atom_type == _ATOM_Q)
-            _qmol->addAtom(QueryMolecule::Atom::und(
-                           QueryMolecule::Atom::nicht(
-                              new QueryMolecule::Atom(QueryMolecule::ATOM_NUMBER, ELEM_H)),
-                           QueryMolecule::Atom::nicht(
-                              new QueryMolecule::Atom(QueryMolecule::ATOM_NUMBER, ELEM_C))));
-         else // _ATOM_R
-            _qmol->addAtom(new QueryMolecule::Atom(QueryMolecule::ATOM_RSITE, 0));
-      }
-
-      int hcount = 0;
-      int irflag = 0;
-      int ecflag = 0;
-      int radical = 0;
-
-      while (true)
-      {
+   
          strscan.skipSpace();
-         if (strscan.isEOF())
-            break;
-
-         QS_DEF(Array<char>, prop_arr);
-         strscan.readWord(prop_arr, "=");
-
-         strscan.skip(1);
-         const char *prop = prop_arr.ptr();
-
-         if (strcmp(prop, "CHG") == 0)
-         {
-            int charge = strscan.readInt1();
-
-            if (_mol != 0)
-               _mol->setAtomCharge_Silent(i, charge);
-            else
-            {
-               _qmol->resetAtom(i, QueryMolecule::Atom::und(_qmol->releaseAtom(i),
-                     new QueryMolecule::Atom(QueryMolecule::ATOM_CHARGE, charge)));
-            }
-         }
-         else if (strcmp(prop, "RAD") == 0)
-         {
-            radical = strscan.readInt1();
-
-            if (_qmol != 0)
-            {
-               _qmol->resetAtom(i, QueryMolecule::Atom::und(_qmol->releaseAtom(i),
-                     new QueryMolecule::Atom(QueryMolecule::ATOM_RADICAL, radical)));
-            }
-         }
-         else if (strcmp(prop, "CFG") == 0)
-         {
-            strscan.readInt1();
-            //int cfg = strscan.readInt1();
-
-            //if (cfg == 3)
-            //   _stereocenter_types[idx] = MoleculeStereocenters::ATOM4;
-         }
-         else if (strcmp(prop, "MASS") == 0)
-         {
-            isotope = strscan.readInt1();
-         }
-         else if (strcmp(prop, "VAL") == 0)
-         {
-            int valence = strscan.readInt1();
-
-            if (valence == -1)
-               valence = 0;
-
-            if (_mol != 0)
-            {
-               _mol->setExplicitValence(i, valence);
-            }
-            else
-            {
-               _qmol->resetAtom(i, QueryMolecule::Atom::und(_qmol->releaseAtom(i),
-                     new QueryMolecule::Atom(QueryMolecule::ATOM_VALENCE, valence)));
-            }
-
-         }
-         else if (strcmp(prop, "HCOUNT") == 0)
-         {
-            int hcount = strscan.readInt1();
-            
-            if (hcount == -1)
-               _hcount[i] = 1;
-            else if (hcount > 0)
-               _hcount[i] = hcount + 1; // to comply to the code in _postLoad()
-            else
-               throw Error("invalid HCOUNT value: %d", hcount);
-         }
-         else if (strcmp(prop, "STBOX") == 0)
-            _stereo_care_atoms[i] = strscan.readInt1();
-         else if (strcmp(prop, "INVRET") == 0)
-            irflag = strscan.readInt1();
-         else if (strcmp(prop, "EXACHG") == 0)
-            ecflag = strscan.readInt1();
-         else if (strcmp(prop, "SUBST") == 0)
-         {
-            if (_qmol == 0)
-               throw Error("substitution count is allowed only for queries");
-
-            int subst = strscan.readInt1();
-
-            if (subst != 0)
-            {
-               if (subst == -1)
-                  _qmol->resetAtom(i, QueryMolecule::Atom::und(_qmol->releaseAtom(i),
-                           new QueryMolecule::Atom(QueryMolecule::ATOM_SUBSTITUENTS, 0)));
-               else if (subst == -2)
-                  throw Error("Query substitution count as drawn is not supported yet (SUBST=%d)", subst);
-               else if (subst > 0)
-                  _qmol->resetAtom(i, QueryMolecule::Atom::und(_qmol->releaseAtom(i),
-                           new QueryMolecule::Atom(QueryMolecule::ATOM_SUBSTITUENTS,
-                                  subst, (subst < 6 ? subst : 100))));
-               else
-                  throw Error("invalid SUBST value: %d", subst);
-            }
-         }
-         else if (strcmp(prop, "UNSAT") == 0)
-         {
-            if (_qmol == 0)
-            {
-               if (!ignore_noncritical_query_features)
-                  throw Error("unsaturation flag is allowed only for queries");
-            }
-            else
-            {
-               bool unsat = (strscan.readInt1() > 0);
-  
-               if (unsat)
-                  _qmol->resetAtom(i, QueryMolecule::Atom::und(_qmol->releaseAtom(i),
-                     new QueryMolecule::Atom(QueryMolecule::ATOM_UNSATURATION, 0)));
-            }
-         }
-         else if (strcmp(prop, "RBCNT") == 0)
-         {
-            if (_qmol == 0)
-            {
-                if (!ignore_noncritical_query_features)
-                   throw Error("ring bond count is allowed only for queries");
-            }
-            else
-            {
-               int rb = strscan.readInt1();
+         float x = strscan.readFloat();
+         strscan.skipSpace();
+         float y = strscan.readFloat();
+         strscan.skipSpace();
+         float z = strscan.readFloat();
+         strscan.skipSpace();
+         int aamap = strscan.readInt1();
    
-               if (rb != 0)
-               {
-                  if (rb == -1)
-                     rb = 0;
-   
-                  if (rb > 1)
-                     _qmol->resetAtom(i, QueryMolecule::Atom::und(_qmol->releaseAtom(i),
-                              new QueryMolecule::Atom(QueryMolecule::ATOM_RING_BONDS, rb, (rb < 4 ? rb : 100))));
-                  else
-                     throw Error("invalid RBCNT value: %d", rb);
-               }
-            }
-         }
-         else if (strcmp(prop, "RGROUPS") == 0)
-         {
-            int n_rg;
-
-            strscan.skip(1); // skip '('
-            n_rg = strscan.readInt1();
-            while (n_rg-- > 0)
-               _bmol->allowRGroupOnRSite(i, strscan.readInt1());
-         }
-         else if (strcmp(prop, "ATTCHPT") == 0)
-         {
-            int att_type = strscan.readInt1();
-
-            if (att_type == -1)
-               att_type = 3;
-
-            for (int att_idx = 0; (1 << att_idx) <= att_type; att_idx++)
-               if (att_type & (1 << att_idx))
-                  _bmol->addAttachmentPoint(att_idx + 1, i);
-         }
-         else if (strcmp(prop, "ATTCHORD") == 0)
-         {
-            int n_items, nei_idx, att_type;
-            QS_DEF(Array<char>, att_id);      
-
-            strscan.skip(1); // skip '('
-            n_items = strscan.readInt1() / 2;
-            while (n_items-- > 0)
-            {
-               nei_idx = strscan.readInt1();
-               if (atom_type == _ATOM_R)
-               {
-                  att_type = strscan.readInt1();
-                  _bmol->setRSiteAttachmentOrder(i, nei_idx - 1, att_type - 1);
-               }
-               else
-               {
-                  strscan.readWord(att_id, " )");
-                  att_id.push(0);
-                  _bmol->setTemplateAtomAttachmentOrder(i, nei_idx - 1, att_id.ptr());
-                  strscan.skip(1); // skip stop character
-               }
-            }
-         }
-         else if (strcmp(prop, "CLASS") == 0)
-         {
-            QS_DEF(Array<char>, temp_class);
-            strscan.readWord(temp_class, 0);
-            temp_class.push(0);
-            if (_mol != 0)
-               _mol->setTemplateAtomClass(i, temp_class.ptr());
-            else
-            {
-               _qmol->resetAtom(i, QueryMolecule::Atom::und(_qmol->releaseAtom(i),
-                     new QueryMolecule::Atom(QueryMolecule::ATOM_TEMPLATE_CLASS, temp_class.ptr())));
-            }
-         }
-         else if (strcmp(prop, "SEQID") == 0)
-         {
-            int seq_id = strscan.readInt1();
-            if (_mol != 0)
-               _mol->setTemplateAtomSeqid(i, seq_id);
-            else
-            {
-               _qmol->resetAtom(i, QueryMolecule::Atom::und(_qmol->releaseAtom(i),
-                     new QueryMolecule::Atom(QueryMolecule::ATOM_TEMPLATE_SEQID, seq_id)));
-            }
-
-         }
-         else
-         {
-            throw Error("unsupported property of CTAB3000: %s", prop);
-         }
-      }
-
-      if (isotope != 0)
-      {
          if (_mol != 0)
-            _mol->setAtomIsotope(i, isotope);
+         {
+            _mol->addAtom(label);
+            if (atom_type == _ATOM_PSEUDO)
+            {
+               _preparePseudoAtomLabel(buf);
+               _mol->setPseudoAtom(i, buf.ptr());
+            }
+            else if (atom_type == _ATOM_TEMPLATE)
+            {
+               _preparePseudoAtomLabel(buf);
+               _mol->setTemplateAtom(i, buf.ptr());
+            }
+         }
          else
-            _qmol->resetAtom(i, QueryMolecule::Atom::und(_qmol->releaseAtom(i),
-                  new QueryMolecule::Atom(QueryMolecule::ATOM_ISOTOPE, isotope)));
+         {
+            if (atom_type == _ATOM_LIST)
+               _qmol->addAtom(query_atom.release());
+            else if (atom_type == _ATOM_NOTLIST)
+               _qmol->addAtom(QueryMolecule::Atom::nicht(query_atom.release()));
+            else if (atom_type == _ATOM_ELEMENT)
+               _qmol->addAtom(new QueryMolecule::Atom(QueryMolecule::ATOM_NUMBER, label));
+            else if (atom_type == _ATOM_PSEUDO)
+               _qmol->addAtom(new QueryMolecule::Atom(QueryMolecule::ATOM_PSEUDO, buf.ptr()));
+            else if (atom_type == _ATOM_TEMPLATE)
+               _qmol->addAtom(new QueryMolecule::Atom(QueryMolecule::ATOM_TEMPLATE, buf.ptr()));
+            else if (atom_type == _ATOM_A)
+               _qmol->addAtom(QueryMolecule::Atom::nicht(
+                           new QueryMolecule::Atom(QueryMolecule::ATOM_NUMBER, ELEM_H)));
+            else if (atom_type == _ATOM_X)
+            {
+               AutoPtr<QueryMolecule::Atom> atom(new QueryMolecule::Atom());
+               
+               atom->type = QueryMolecule::OP_OR;
+               atom->children.add(new QueryMolecule::Atom(QueryMolecule::ATOM_NUMBER, ELEM_F));
+               atom->children.add(new QueryMolecule::Atom(QueryMolecule::ATOM_NUMBER, ELEM_Cl));
+               atom->children.add(new QueryMolecule::Atom(QueryMolecule::ATOM_NUMBER, ELEM_Br));
+               atom->children.add(new QueryMolecule::Atom(QueryMolecule::ATOM_NUMBER, ELEM_I));
+               atom->children.add(new QueryMolecule::Atom(QueryMolecule::ATOM_NUMBER, ELEM_At));
+               _qmol->addAtom(atom.release());
+            }
+            else if (atom_type == _ATOM_Q)
+               _qmol->addAtom(QueryMolecule::Atom::und(
+                              QueryMolecule::Atom::nicht(
+                                 new QueryMolecule::Atom(QueryMolecule::ATOM_NUMBER, ELEM_H)),
+                              QueryMolecule::Atom::nicht(
+                                 new QueryMolecule::Atom(QueryMolecule::ATOM_NUMBER, ELEM_C))));
+            else // _ATOM_R
+               _qmol->addAtom(new QueryMolecule::Atom(QueryMolecule::ATOM_RSITE, 0));
+         }
+   
+         int hcount = 0;
+         int irflag = 0;
+         int ecflag = 0;
+         int radical = 0;
+   
+         while (true)
+         {
+            strscan.skipSpace();
+            if (strscan.isEOF())
+               break;
+   
+            QS_DEF(Array<char>, prop_arr);
+            strscan.readWord(prop_arr, "=");
+   
+            strscan.skip(1);
+            const char *prop = prop_arr.ptr();
+   
+            if (strcmp(prop, "CHG") == 0)
+            {
+               int charge = strscan.readInt1();
+   
+               if (_mol != 0)
+                  _mol->setAtomCharge_Silent(i, charge);
+               else
+               {
+                  _qmol->resetAtom(i, QueryMolecule::Atom::und(_qmol->releaseAtom(i),
+                        new QueryMolecule::Atom(QueryMolecule::ATOM_CHARGE, charge)));
+               }
+            }
+            else if (strcmp(prop, "RAD") == 0)
+            {
+               radical = strscan.readInt1();
+   
+               if (_qmol != 0)
+               {
+                  _qmol->resetAtom(i, QueryMolecule::Atom::und(_qmol->releaseAtom(i),
+                        new QueryMolecule::Atom(QueryMolecule::ATOM_RADICAL, radical)));
+               }
+            }
+            else if (strcmp(prop, "CFG") == 0)
+            {
+               strscan.readInt1();
+               //int cfg = strscan.readInt1();
+   
+               //if (cfg == 3)
+               //   _stereocenter_types[idx] = MoleculeStereocenters::ATOM4;
+            }
+            else if (strcmp(prop, "MASS") == 0)
+            {
+               isotope = strscan.readInt1();
+            }
+            else if (strcmp(prop, "VAL") == 0)
+            {
+               int valence = strscan.readInt1();
+   
+               if (valence == -1)
+                  valence = 0;
+   
+               if (_mol != 0)
+               {
+                  _mol->setExplicitValence(i, valence);
+               }
+               else
+               {
+                  _qmol->resetAtom(i, QueryMolecule::Atom::und(_qmol->releaseAtom(i),
+                        new QueryMolecule::Atom(QueryMolecule::ATOM_VALENCE, valence)));
+               }
+   
+            }
+            else if (strcmp(prop, "HCOUNT") == 0)
+            {
+               int hcount = strscan.readInt1();
+
+               if (_qmol == 0)
+               {
+                   if (!ignore_noncritical_query_features)
+                      throw Error("H count is allowed only for queries");
+               }
+               
+               if (hcount == -1)
+                  _hcount[i] = 1;
+               else if (hcount > 0)
+                  _hcount[i] = hcount + 1; // to comply to the code in _postLoad()
+               else
+                  throw Error("invalid HCOUNT value: %d", hcount);
+            }
+            else if (strcmp(prop, "STBOX") == 0)
+               _stereo_care_atoms[i] = strscan.readInt1();
+            else if (strcmp(prop, "INVRET") == 0)
+               irflag = strscan.readInt1();
+            else if (strcmp(prop, "EXACHG") == 0)
+               ecflag = strscan.readInt1();
+            else if (strcmp(prop, "SUBST") == 0)
+            {
+               if (_qmol == 0)
+                  throw Error("substitution count is allowed only for queries");
+   
+               int subst = strscan.readInt1();
+   
+               if (subst != 0)
+               {
+                  if (subst == -1)
+                     _qmol->resetAtom(i, QueryMolecule::Atom::und(_qmol->releaseAtom(i),
+                              new QueryMolecule::Atom(QueryMolecule::ATOM_SUBSTITUENTS, 0)));
+                  else if (subst == -2)
+                     throw Error("Query substitution count as drawn is not supported yet (SUBST=%d)", subst);
+                  else if (subst > 0)
+                     _qmol->resetAtom(i, QueryMolecule::Atom::und(_qmol->releaseAtom(i),
+                              new QueryMolecule::Atom(QueryMolecule::ATOM_SUBSTITUENTS,
+                                     subst, (subst < 6 ? subst : 100))));
+                  else
+                     throw Error("invalid SUBST value: %d", subst);
+               }
+            }
+            else if (strcmp(prop, "UNSAT") == 0)
+            {
+               if (_qmol == 0)
+               {
+                  if (!ignore_noncritical_query_features)
+                     throw Error("unsaturation flag is allowed only for queries");
+               }
+               else
+               {
+                  bool unsat = (strscan.readInt1() > 0);
+     
+                  if (unsat)
+                     _qmol->resetAtom(i, QueryMolecule::Atom::und(_qmol->releaseAtom(i),
+                        new QueryMolecule::Atom(QueryMolecule::ATOM_UNSATURATION, 0)));
+               }
+            }
+            else if (strcmp(prop, "RBCNT") == 0)
+            {
+               if (_qmol == 0)
+               {
+                   if (!ignore_noncritical_query_features)
+                      throw Error("ring bond count is allowed only for queries");
+               }
+               else
+               {
+                  int rb = strscan.readInt1();
+      
+                  if (rb != 0)
+                  {
+                     if (rb == -1)
+                        rb = 0;
+      
+                     if (rb > 1)
+                        _qmol->resetAtom(i, QueryMolecule::Atom::und(_qmol->releaseAtom(i),
+                                 new QueryMolecule::Atom(QueryMolecule::ATOM_RING_BONDS, rb, (rb < 4 ? rb : 100))));
+                     else
+                        throw Error("invalid RBCNT value: %d", rb);
+                  }
+               }
+            }
+            else if (strcmp(prop, "RGROUPS") == 0)
+            {
+               int n_rg;
+   
+               strscan.skip(1); // skip '('
+               n_rg = strscan.readInt1();
+               while (n_rg-- > 0)
+                  _bmol->allowRGroupOnRSite(i, strscan.readInt1());
+            }
+            else if (strcmp(prop, "ATTCHPT") == 0)
+            {
+               int att_type = strscan.readInt1();
+   
+               if (att_type == -1)
+                  att_type = 3;
+   
+               for (int att_idx = 0; (1 << att_idx) <= att_type; att_idx++)
+                  if (att_type & (1 << att_idx))
+                     _bmol->addAttachmentPoint(att_idx + 1, i);
+            }
+            else if (strcmp(prop, "ATTCHORD") == 0)
+            {
+               int n_items, nei_idx, att_type;
+               QS_DEF(Array<char>, att_id);      
+   
+               strscan.skip(1); // skip '('
+               n_items = strscan.readInt1() / 2;
+               while (n_items-- > 0)
+               {
+                  nei_idx = strscan.readInt1();
+                  if (atom_type == _ATOM_R)
+                  {
+                     att_type = strscan.readInt1();
+                     _bmol->setRSiteAttachmentOrder(i, nei_idx - 1, att_type - 1);
+                  }
+                  else
+                  {
+                     strscan.readWord(att_id, " )");
+                     att_id.push(0);
+                     _bmol->setTemplateAtomAttachmentOrder(i, nei_idx - 1, att_id.ptr());
+                     strscan.skip(1); // skip stop character
+                  }
+               }
+            }
+            else if (strcmp(prop, "CLASS") == 0)
+            {
+               QS_DEF(Array<char>, temp_class);
+               strscan.readWord(temp_class, 0);
+               temp_class.push(0);
+               if (_mol != 0)
+                  _mol->setTemplateAtomClass(i, temp_class.ptr());
+               else
+               {
+                  _qmol->resetAtom(i, QueryMolecule::Atom::und(_qmol->releaseAtom(i),
+                        new QueryMolecule::Atom(QueryMolecule::ATOM_TEMPLATE_CLASS, temp_class.ptr())));
+               }
+            }
+            else if (strcmp(prop, "SEQID") == 0)
+            {
+               int seq_id = strscan.readInt1();
+               if (_mol != 0)
+                  _mol->setTemplateAtomSeqid(i, seq_id);
+               else
+               {
+                  _qmol->resetAtom(i, QueryMolecule::Atom::und(_qmol->releaseAtom(i),
+                        new QueryMolecule::Atom(QueryMolecule::ATOM_TEMPLATE_SEQID, seq_id)));
+               }
+   
+            }
+            else
+            {
+               throw Error("unsupported property of CTAB3000: %s", prop);
+            }
+         }
+   
+         if (isotope != 0)
+         {
+            if (_mol != 0)
+               _mol->setAtomIsotope(i, isotope);
+            else
+               _qmol->resetAtom(i, QueryMolecule::Atom::und(_qmol->releaseAtom(i),
+                     new QueryMolecule::Atom(QueryMolecule::ATOM_ISOTOPE, isotope)));
+         }
+   
+         if (_mol != 0)
+            _mol->setAtomRadical(i, radical);
+   
+         _bmol->reaction_atom_inversion[i]= irflag;
+         _bmol->reaction_atom_exact_change[i] = ecflag;
+         _bmol->reaction_atom_mapping[i] = aamap;
+   
+         _bmol->setAtomXyz(i, x, y, z);
       }
-
-      if (_mol != 0)
-         _mol->setAtomRadical(i, radical);
-
-      if (reaction_atom_inversion != 0)
-         reaction_atom_inversion->at(i) = irflag;
-
-      if (reaction_atom_exact_change != 0)
-         reaction_atom_exact_change->at(i) = ecflag;
-
-      if (reaction_atom_mapping != 0)
-         reaction_atom_mapping->at(i) = aamap;
-
-      _bmol->setAtomXyz(i, x, y, z);
+      _scanner.readLine(str, true);
+      if (strncmp(str.ptr(), "M  V30 END ATOM", 15) != 0)
+         throw Error("Error reading ATOM block footer");
    }
 
-   _scanner.readLine(str, true);
-   if (strncmp(str.ptr(), "M  V30 END ATOM", 15) != 0)
-      throw Error("Error reading ATOM block footer");
-
-   _scanner.readLine(str, true);
-   }
+   if (atom_block_exists)
+      _scanner.readLine(str, true);
    if (strncmp(str.ptr(), "M  V30 BEGIN BOND", 17) != 0)
    {  
       if (_bonds_num > 0)
          throw Error("Error reading BOND block header");
+      bond_block_exists = false;
    }
    else
    {
@@ -2732,8 +2736,7 @@ void MolfileLoader::_readCtab3000 ()
                }
             }
          }
-         if (reaction_bond_reacting_center != 0)
-            reaction_bond_reacting_center->at(i) = reacting_center;
+         _bmol->reaction_bond_reacting_center[i] = reacting_center;
       }
 
       _scanner.readLine(str, true);
@@ -3268,6 +3271,25 @@ void MolfileLoader::_readSGroup3000 (const char *str)
          if (sup != 0)
             sup->sa_class.push(0);
       }
+      else if (strcmp(entity.ptr(), "SEQID") == 0)
+      {
+         int seqid = scanner.readInt();
+         if ((sup != 0) && seqid > 0)
+            sup->seqid = seqid;
+      }
+      else if (strcmp(entity.ptr(), "NATREPLACE") == 0)
+      {
+         while (!scanner.isEOF())
+         {
+            char c = scanner.readChar();
+            if (c == ' ')
+               break;
+            if (sup != 0)
+               sup->sa_natreplace.push(c);
+         }
+         if (sup != 0)
+            sup->sa_natreplace.push(0);
+      }
       else if (strcmp(entity.ptr(), "ESTATE") == 0)
       {
          while (!scanner.isEOF())
@@ -3415,11 +3437,15 @@ void MolfileLoader::_readTGroups3000 ()
                tgroup.tgroup_class.copy(word);
                strscan.readWord(word, " /");
                tgroup.tgroup_name.copy(word);
-               stop_char = strscan.readChar();
-               if (stop_char == '/')
+
+               if (!strscan.isEOF())
                {
-                  strscan.readWord(word, 0);
-                  tgroup.tgroup_alias.copy(word);
+                  stop_char = strscan.readChar();
+                  if (stop_char == '/' && !strscan.isEOF())
+                  {
+                     strscan.readWord(word, 0);
+                     tgroup.tgroup_alias.copy(word);
+                  }
                }
             }
             else
@@ -3434,6 +3460,14 @@ void MolfileLoader::_readTGroups3000 ()
                {
                   _readStringInQuotes(strscan, &tgroup.tgroup_comment);
                }
+
+               if (strcmp(word.ptr(), "NATREPLACE") == 0)
+               {
+                  _readStringInQuotes(strscan, &tgroup.tgroup_natreplace);
+               }
+
+               if (!strscan.isEOF())
+                  strscan.skip(1);
             }
              
 
@@ -3442,19 +3476,22 @@ void MolfileLoader::_readTGroups3000 ()
             if (strcmp(str.ptr(), "M  V30 BEGIN CTAB") == 0)
             {
                _scanner.seek(pos, SEEK_SET);
-               tgroup.fragment = _bmol->neu();
+               AutoPtr<BaseMolecule> fragment(_bmol->neu());
+               tgroup.fragment.reset(fragment.release());
+
+//               tgroup.fragment = _bmol->neu();
 
                MolfileLoader loader(_scanner);
-               loader._bmol = tgroup.fragment;
+               loader._bmol = tgroup.fragment.get();
                if (_bmol->isQueryMolecule())
                {
-                  loader._qmol = (QueryMolecule *)tgroup.fragment;
+                  loader._qmol = &loader._bmol->asQueryMolecule();
                   loader._mol = 0;
                }
                else
                {
                   loader._qmol = 0;
-				  loader._mol = (Molecule *)tgroup.fragment;
+                  loader._mol = &loader._bmol->asMolecule();
                }
                loader._readCtab3000();
                loader._postLoad();
@@ -3508,6 +3545,8 @@ void MolfileLoader::_readSGroupDisplay (Scanner &scanner, DataSGroup &dsg)
    if (end - cur + 1 > 16)
    {
       scanner.skip(2);
+      if (scanner.lookNext() == '\n' || scanner.lookNext() == '\r')
+         return;
       int c = scanner.readChar();
       if (c >= '1' && c <= '9')
          dsg.dasp_pos = c - '0';
@@ -3537,12 +3576,12 @@ void MolfileLoader::_init ()
    _stereo_care_bonds.clear_resize(_bonds_num);
    _stereo_care_bonds.zerofill();
 
-   if (reaction_atom_mapping != 0)
-      reaction_atom_mapping->clear_resize(_atoms_num);
-   if (reaction_atom_inversion != 0)
-      reaction_atom_inversion->clear_resize(_atoms_num);
-   if (reaction_atom_exact_change != 0)
-      reaction_atom_exact_change->clear_resize(_atoms_num);
-   if (reaction_bond_reacting_center != 0)
-      reaction_bond_reacting_center->clear_resize(_bonds_num);
+   _bmol->reaction_atom_mapping.clear_resize(_atoms_num);
+   _bmol->reaction_atom_mapping.zerofill();
+   _bmol->reaction_atom_inversion.clear_resize(_atoms_num);
+   _bmol->reaction_atom_inversion.zerofill();
+   _bmol->reaction_atom_exact_change.clear_resize(_atoms_num);
+   _bmol->reaction_atom_exact_change.zerofill();
+   _bmol->reaction_bond_reacting_center.clear_resize(_bonds_num);
+   _bmol->reaction_bond_reacting_center.zerofill();
 }

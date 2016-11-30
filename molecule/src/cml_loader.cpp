@@ -118,6 +118,7 @@ struct Atom
       id, 
       element_type, 
       label, 
+      alias, 
       isotope, 
       formal_charge,
       spin_multiplicity, 
@@ -128,6 +129,9 @@ struct Atom
       attorder, 
       query_props, 
       hydrogen_count, 
+      atom_mapping, 
+      atom_inversion, 
+      atom_exact_change, 
       x, y, z;
 };
 
@@ -166,9 +170,11 @@ void CmlLoader::_loadMoleculeElement (TiXmlHandle &handle)
    };
 
    QS_DEF(Array<int>, total_h_count);
+   QS_DEF(Array<int>, query_h_count);
    atoms_id.clear();
    atoms_id_int.clear();
    total_h_count.clear();
+   query_h_count.clear();
 
    const char *title = handle.Element()->Attribute("title");
 
@@ -214,6 +220,10 @@ void CmlLoader::_loadMoleculeElement (TiXmlHandle &handle)
    splitStringIntoProperties(atom_array.Element()->Attribute("attachmentPoint"), atoms, &Atom::attpoint);
    splitStringIntoProperties(atom_array.Element()->Attribute("attachmentOrder"), atoms, &Atom::attorder);
    splitStringIntoProperties(atom_array.Element()->Attribute("mrvQueryProps"), atoms, &Atom::query_props);
+   splitStringIntoProperties(atom_array.Element()->Attribute("mrvAlias"), atoms, &Atom::alias);
+   splitStringIntoProperties(atom_array.Element()->Attribute("mrvMap"), atoms, &Atom::atom_mapping);
+   splitStringIntoProperties(atom_array.Element()->Attribute("reactionStereo"), atoms, &Atom::atom_inversion);
+   splitStringIntoProperties(atom_array.Element()->Attribute("exactChage"), atoms, &Atom::atom_exact_change);
 
    // Read atoms as nested xml elements
    //   <atomArray>
@@ -255,6 +265,10 @@ void CmlLoader::_loadMoleculeElement (TiXmlHandle &handle)
       if (pseudo != 0)
          a.label = pseudo;
 
+      const char *alias = elem->Attribute("mrvAlias");
+
+      if (alias != 0)
+         a.alias = alias;
 
       const char *isotope = elem->Attribute("isotope");
 
@@ -288,6 +302,21 @@ void CmlLoader::_loadMoleculeElement (TiXmlHandle &handle)
 
       if (hcount != 0)
          a.hydrogen_count = hcount;
+
+      const char *atom_map = elem->Attribute("mrvMap");
+
+      if (atom_map != 0)
+         a.atom_mapping = atom_map;
+
+      const char *atom_inv = elem->Attribute("reactionStereo");
+
+      if (atom_inv != 0)
+         a.atom_inversion = atom_inv;
+
+      const char *atom_exact = elem->Attribute("exactChange");
+
+      if (atom_exact != 0)
+         a.atom_exact_change = atom_exact;
 
       const char *x2 = elem->Attribute("x2");
       const char *y2 = elem->Attribute("y2");
@@ -327,8 +356,12 @@ void CmlLoader::_loadMoleculeElement (TiXmlHandle &handle)
       const char *query_props = elem->Attribute("mrvQueryProps");
 
       if (query_props != 0)
-         a.query_props = query_props;
-
+      {
+         if (_qmol != 0)
+            a.query_props = query_props;
+         else
+            throw Error("'query features' are allowed only for queries");
+      }
    }
 
    // Parse them
@@ -368,6 +401,7 @@ void CmlLoader::_loadMoleculeElement (TiXmlHandle &handle)
             }
    
             total_h_count.expandFill(idx + 1, -1);
+            query_h_count.expandFill(idx + 1, -1);
       
             atoms_id.emplace(a.id, idx);
       
@@ -431,30 +465,11 @@ void CmlLoader::_loadMoleculeElement (TiXmlHandle &handle)
                   throw Error("negative hydrogen count");
                total_h_count[idx] = val;
             }
-     
-            if (!a.rgroupref.empty())
-            {
-               int val;
-               if (sscanf(a.rgroupref.c_str(), "%d", &val) != 1)
-                  throw Error("error parsing R-group reference");
-               _mol->allowRGroupOnRSite(idx, val);
-            }
-      
-            if (!a.attpoint.empty())
-            {
-               int val;
-               if (strncmp(a.attpoint.c_str(), "both", 4) == 0)
-                  val = 3;
-               else if (sscanf(a.attpoint.c_str(), "%d", &val) != 1)
-                  throw Error("error parsing Attachment point");
-               for (int att_idx = 0; (1 << att_idx) <= val; att_idx++)
-                  if (val & (1 << att_idx))
-                     _mol->addAttachmentPoint(att_idx + 1, idx);
-            }
          }
          else 
          {
             AutoPtr<QueryMolecule::Atom> atom;
+            int qhcount = -1;
    
             if (label == ELEM_PSEUDO)
             {
@@ -527,7 +542,7 @@ void CmlLoader::_loadMoleculeElement (TiXmlHandle &handle)
                      else if (rbcount == 0)
                         atom.reset(QueryMolecule::Atom::und(atom.release(),
                            new QueryMolecule::Atom(QueryMolecule::ATOM_RING_BONDS, 0)));
-                     else if (rbcount == 2)
+                     else if (rbcount == -2)
                         atom.reset(QueryMolecule::Atom::und(atom.release(),
                            new QueryMolecule::Atom(QueryMolecule::ATOM_RING_BONDS_AS_DRAWN, 0)));
                   }     
@@ -561,6 +576,18 @@ void CmlLoader::_loadMoleculeElement (TiXmlHandle &handle)
                         atom.reset(QueryMolecule::Atom::und(atom.release(),
                                  new QueryMolecule::Atom(QueryMolecule::ATOM_UNSATURATION, 0)));
                   }
+                  else if (strncmp(qf.ptr(), "H", 1) == 0)
+                  {
+                     BufferScanner qfscan(qf.ptr());
+                     qfscan.skip(1);
+                     qhcount = qfscan.readInt1();
+/*
+                     if (total_h > 0)
+                        atom.reset(QueryMolecule::Atom::und(atom.release(),
+                                 new QueryMolecule::Atom(QueryMolecule::ATOM_TOTAL_H, total_h)));
+*/
+                  }
+
                   if (!strscan.isEOF())
                      strscan.skip(1);
                }
@@ -622,6 +649,29 @@ void CmlLoader::_loadMoleculeElement (TiXmlHandle &handle)
             idx = _qmol->addAtom(atom.release());
             atoms_id.emplace(a.id, idx);
             total_h_count.expandFill(idx + 1, -1);
+            query_h_count.expandFill(idx + 1, -1);
+            query_h_count[idx] = qhcount;
+         }
+
+
+         if (!a.rgroupref.empty())
+         {
+            int val;
+            if (sscanf(a.rgroupref.c_str(), "%d", &val) != 1)
+               throw Error("error parsing R-group reference");
+            _bmol->allowRGroupOnRSite(idx, val);
+         }
+   
+         if (!a.attpoint.empty())
+         {
+            int val;
+            if (strncmp(a.attpoint.c_str(), "both", 4) == 0)
+               val = 3;
+            else if (sscanf(a.attpoint.c_str(), "%d", &val) != 1)
+               throw Error("error parsing Attachment point");
+            for (int att_idx = 0; (1 << att_idx) <= val; att_idx++)
+               if (val & (1 << att_idx))
+                  _bmol->addAttachmentPoint(att_idx + 1, idx);
          }
 
          if (!a.x.empty())
@@ -635,6 +685,45 @@ void CmlLoader::_loadMoleculeElement (TiXmlHandle &handle)
          if (!a.z.empty())
             if (sscanf(a.z.c_str(), "%f", &_bmol->getAtomXyz(idx).z) != 1)
                throw Error("error parsing z");
+
+         if (!a.alias.empty())
+         {
+            if (strncmp(a.alias.c_str(), "0", 1) != 0)
+            {            
+               int sg_idx = _bmol->sgroups.addSGroup(SGroup::SG_TYPE_DAT);
+               DataSGroup &sgroup = (DataSGroup &)_bmol->sgroups.getSGroup(sg_idx);
+      
+               sgroup.atoms.push(idx);
+               sgroup.name.readString("INDIGO_ALIAS", true);
+               sgroup.data.readString(a.alias.c_str(), true);
+               sgroup.display_pos.x = _bmol->getAtomXyz(idx).x;
+               sgroup.display_pos.y = _bmol->getAtomXyz(idx).y;
+            }
+         }
+
+         if (!a.atom_mapping.empty())
+         {
+            int val;
+            if (sscanf(a.atom_mapping.c_str(), "%d", &val) != 1)
+               throw Error("error parsing atom-atom mapping");
+            _bmol->reaction_atom_mapping[idx] = val;
+         }
+
+         if (!a.atom_inversion.empty())
+         {
+            if (strncmp(a.atom_inversion.c_str(), "Inv", 3) == 0)
+              _bmol->reaction_atom_inversion[idx] = 1;
+            else if (strncmp(a.atom_inversion.c_str(), "Ret", 3) == 0)
+              _bmol->reaction_atom_inversion[idx] = 2;
+         }
+
+         if (!a.atom_exact_change.empty())
+         {
+            int val;
+            if (sscanf(a.atom_exact_change.c_str(), "%d", &val) != 1)
+               throw Error("error parsing atom exact change flag");
+            _bmol->reaction_atom_exact_change[idx] = val;
+         }
 
       }
 /*
@@ -693,15 +782,18 @@ void CmlLoader::_loadMoleculeElement (TiXmlHandle &handle)
             throw Error("error parsing order");
       }
 
+      const char *query_type = elem->Attribute("queryType");
 
       if (_mol != 0)
       {
-         idx = _mol->addBond_Silent(beg, end, order_val);
+         if (query_type == 0)
+            idx = _mol->addBond_Silent(beg, end, order_val);
+         else
+            throw Error("'query type' bonds are allowed only for queries");
       }
       else
       {
          AutoPtr<QueryMolecule::Bond> bond;
-         const char *query_type = elem->Attribute("queryType");
 
          if (query_type == 0)
          {
@@ -729,8 +821,20 @@ void CmlLoader::_loadMoleculeElement (TiXmlHandle &handle)
          else
             throw Error("unknown bond type: %d", order);
 
-         idx = _qmol->addBond(beg, end, bond.release());
+         const char *topology = elem->Attribute("topology");
+         if (topology != 0)
+         {
+            if (strncmp(topology, "ring", 4) == 0)
+               bond.reset(QueryMolecule::Bond::und(bond.release(),
+                  new QueryMolecule::Bond(QueryMolecule::BOND_TOPOLOGY, TOPOLOGY_RING)));
+            else if (strncmp(topology, "chain", 5) == 0)
+               bond.reset(QueryMolecule::Bond::und(bond.release(),
+                  new QueryMolecule::Bond(QueryMolecule::BOND_TOPOLOGY, TOPOLOGY_CHAIN)));
+            else
+               throw Error("unknown topology: %s", topology);
+         }
 
+         idx = _qmol->addBond(beg, end, bond.release());
       }
 
 
@@ -750,10 +854,28 @@ void CmlLoader::_loadMoleculeElement (TiXmlHandle &handle)
             if ((text[0] == 'C' || text[0] == 'T') && text[1] == 0)
                have_cistrans_notation = true;
          }
+         else
+         {
+            const char *convention = bs_elem->Attribute("convention");
+            if (convention != 0)
+            {
+               have_cistrans_notation = true;
+            }
+         }
       }
 
       if (dir != 0)
          _bmol->setBondDirection(idx, dir);
+
+      const char *brcenter = elem->Attribute("mrvReactingCenter");
+
+      if (brcenter != 0)
+      {
+         int val;
+         if (sscanf(brcenter, "%d", &val) != 1)
+            throw Error("error parsing reacting center flag");
+         _bmol->reaction_bond_reacting_center[idx] = val;
+      }
    }
 
    // Implicit H counts
@@ -777,6 +899,41 @@ void CmlLoader::_loadMoleculeElement (TiXmlHandle &handle)
 
       if (_mol != 0)
          _mol->setImplicitH(i, h);
+   }
+
+   // Query H counts
+   if (_qmol != 0)
+   {
+      for (i = _bmol->vertexBegin(); i != _bmol->vertexEnd(); i = _bmol->vertexNext(i))
+      {
+         int expl_h = 0;
+         
+         if (query_h_count[i] >= 0)
+         {
+            // count explicit hydrogens
+            const Vertex &vertex = _bmol->getVertex(i);
+            
+            for (j = vertex.neiBegin(); j != vertex.neiEnd(); j = vertex.neiNext(j))
+            {
+               if (_bmol->getAtomNumber(vertex.neiVertex(j)) == ELEM_H)
+                  expl_h++;
+            }
+         }
+
+         if (query_h_count[i] == 0) 
+         {
+            // no hydrogens unless explicitly drawn
+            _qmol->resetAtom(i, QueryMolecule::Atom::und(_qmol->releaseAtom(i),
+               new QueryMolecule::Atom(QueryMolecule::ATOM_TOTAL_H, expl_h)));
+         }
+         else if (query_h_count[i] > 0)
+         {
+            // (_hcount[k] - 1) or more atoms in addition to explicitly drawn
+            // no hydrogens unless explicitly drawn
+            _qmol->resetAtom(i, QueryMolecule::Atom::und(_qmol->releaseAtom(i),
+               new QueryMolecule::Atom(QueryMolecule::ATOM_TOTAL_H, expl_h + query_h_count[i], 100)));
+         }
+      }
    }
 
    // Tetrahedral stereocenters
@@ -860,6 +1017,25 @@ void CmlLoader::_loadMoleculeElement (TiXmlHandle &handle)
 
          if (bs_elem == 0)
             continue;
+
+         const char *convention = bs_elem->Attribute("convention");
+         if (convention != 0)
+         {
+            const char *convention_value = bs_elem->Attribute("conventionValue");
+            if (convention_value != 0)
+            {
+               if (strncmp(convention, "MDL", 3) == 0)
+               {
+                  int val;
+                  if (sscanf(convention_value, "%d", &val) != 1)
+                      throw Error("error conventionValue attribute");
+                  if (val == 3)
+                  {
+                     _bmol->cis_trans.ignore(bond_idx);
+                  }
+               }
+            }
+         }
 
          const char *text = bs_elem->GetText();
 
@@ -961,7 +1137,7 @@ void CmlLoader::_loadSGroupElement (TiXmlElement *elem, std::unordered_map<std::
       return it->second;
    };
 
-   MoleculeSGroups *sgroups = &_mol->sgroups;
+   MoleculeSGroups *sgroups = &_bmol->sgroups;
 
    DataSGroup *dsg = 0;
    SGroup *gen = 0;

@@ -32,7 +32,7 @@ ignore_atom_charges(false),
 ignore_atom_valence(false),
 ignore_atom_isotopes(false),
 ignore_atom_radicals(false),
-cancellation(0),
+cancellation(nullptr),
 _initReaction(reaction),
 _maxMapUsed(0),
 _maxVertUsed(0),
@@ -45,10 +45,11 @@ void ReactionAutomapper::automap(int mode) {
 
    QS_DEF(ObjArray< Array<int> >, mol_mappings);
    QS_DEF(Array<int>, react_mapping);
+   
    /*
-    * Set cancellation handler
+    * Set cancellation
     */
-   AAMCancellationWrapper canc_wrapper(cancellation);
+   cancellation = getCancellationHandler();
    
    /*
     * Check input atom mapping (if any)
@@ -274,7 +275,7 @@ void ReactionAutomapper::_createReactionMap(){
          /*
           * Check for cancellation
           */
-         if(cancellation && cancellation->isCancelled())
+         if(cancellation != nullptr && cancellation->isCancelled())
             break;
       }
       _usedVertices.zerofill();
@@ -319,7 +320,7 @@ int ReactionAutomapper::_handleWithProduct(const Array<int>& reactant_cons, Arra
     *delete hydrogens
     */
    vertices_to_remove.clear();
-   for(int k = product_cut.vertexBegin(); k < product_cut.vertexEnd(); k = product_cut.vertexNext(k))
+   for(int k : product_cut.vertices())
       if(product_cut.getAtomNumber(k) == ELEM_H)
          vertices_to_remove.push(k);
    product_cut.removeAtoms(vertices_to_remove);
@@ -327,60 +328,81 @@ int ReactionAutomapper::_handleWithProduct(const Array<int>& reactant_cons, Arra
    product_mapping_tmp.zerofill();
    
    _usedVertices[0] = 0;
+   int previuosly_used= -1;
+   
+   while(previuosly_used != _usedVertices[0]) {
+      previuosly_used = _usedVertices[0];
+      
+      for(int perm_idx = 0; perm_idx < reactant_cons.size(); perm_idx++) {
+         int react = reactant_cons.at(perm_idx);
+         
+         auto& reactant_r = reaction.getBaseMolecule(react);
+         int react_vsize = reactant_r.vertexEnd();
+         rsub_map_in.resize(react_vsize);
+         for(int k = 0; k < react_vsize; k++)
+            rsub_map_in[k] = SubstructureMcs::UNMAPPED;
 
-   for(int perm_idx = 0; perm_idx < reactant_cons.size(); perm_idx++){
-      int react = reactant_cons.at(perm_idx);
+         bool map_exc = false;
+         if(_mode != AAM_REGEN_DISCARD){
+            for(int m : product_cut.vertices()){
+               react_map_match.getAtomMap(product, react, m, &matching_map);
 
-      int react_vsize = reaction.getBaseMolecule(react).vertexEnd();
-      rsub_map_in.resize(react_vsize);
-      for(int k = 0; k < react_vsize; k++)
-         rsub_map_in[k] = SubstructureMcs::UNMAPPED;
-
-
-      bool map_exc = false;
-      if(_mode != AAM_REGEN_DISCARD){
-         for(int m = product_cut.vertexBegin(); m < product_cut.vertexEnd(); m = product_cut.vertexNext(m)){
-            react_map_match.getAtomMap(product, react, m, &matching_map);
-
-            for(int k = 0; k < matching_map.size();k++) {
-               rsub_map_in[matching_map[k]] = m;
-               map_exc = true;
-               break;
+               for(int k = 0; k < matching_map.size();k++) {
+                  rsub_map_in[matching_map[k]] = m;
+                  map_exc = true;
+                  break;
+               }
             }
          }
-      }
 
-      if(!map_exc) 
-         rsub_map_in.clear();
-      RSubstructureMcs react_sub_mcs(reaction, react, product, *this);
-      bool find_sub = react_sub_mcs.searchSubstructureReact(_reaction.getBaseMolecule(react), &rsub_map_in, &rsub_map_out);
-      if (!find_sub) {
-         react_sub_mcs.searchMaxCommonSubReact(&rsub_map_in, &rsub_map_out);
-      }
-
-      bool cur_used = false;
-      for (int j = 0; j < rsub_map_out.size(); j++) {
-         int v = rsub_map_out.at(j);
-         if (v >= 0) {
-            /*
-             * Check delta Y exchange problem possibility
-             */
-            if(!product_cut.hasVertex(v))
-               continue;
-            
-            cur_used = true;
-            product_mapping_tmp[v] = reaction.getAAM(react, j);
-            if (_usedVertices[product_mapping_tmp[v]] == 0)
-               ++_usedVertices[0];
-            product_cut.removeAtom(v);
+         if(!map_exc) 
+            rsub_map_in.clear();
+         /*
+          * First search substructure
+          */
+         RSubstructureMcs react_sub_mcs(reaction, react, product, *this);
+         bool find_sub = react_sub_mcs.searchSubstructureReact(_reaction.getBaseMolecule(react), 
+                 &rsub_map_in, &rsub_map_out);
+         
+         if (!find_sub) {
+            react_sub_mcs.searchMaxCommonSubReact(&rsub_map_in, &rsub_map_out);
          }
-      }
-      if(!cur_used)
-         ++map_complete;
 
-      if(product_cut.vertexCount() == 0) {
-         map_complete += reactant_cons.size() - perm_idx - 1;
-         break;
+         bool cur_used = false;
+         for (int j = 0; j < rsub_map_out.size(); j++) {
+            int v = rsub_map_out.at(j);
+            if (v >= 0) {
+               /*
+                * Check delta Y exchange problem possibility
+                */
+               if(!product_cut.hasVertex(v))
+                  continue;
+
+               cur_used = true;
+               product_mapping_tmp[v] = reaction.getAAM(react, j);
+               if (_usedVertices[product_mapping_tmp[v]] == 0) {
+                  _usedVertices[product_mapping_tmp[v]] = 1;
+                  ++_usedVertices[0];
+               }
+               product_cut.removeAtom(v);
+            }
+         }
+         if(!cur_used)
+            ++map_complete;
+
+         if(product_cut.vertexCount() == 0) {
+            map_complete += reactant_cons.size() - perm_idx - 1;
+            break;
+         }
+         /*
+          * Remove mapped atoms for reactant
+          */
+         vertices_to_remove.clear();
+         for(int k : reactant_r.vertices()) {
+            if(_usedVertices[reaction.getAAM(react, k)] > 0)
+               vertices_to_remove.push(k);
+         }
+         reactant_r.removeAtoms(vertices_to_remove);
       }
    }
    return map_complete;
@@ -401,17 +423,21 @@ bool ReactionAutomapper::_chooseBestMapping(BaseReaction& reaction, Array<int>& 
       _maxVertUsed = _usedVertices[0];
       _maxCompleteMap = map_complete;
       reaction.getAAMArray(product).copy(product_mapping);
-      /*
-       * Check if map covers all a reaction molecules
-       */
-      total_map_used = 0;
-      for (int i = 1; i < _usedVertices.size(); ++i) {
-         if(_usedVertices[i]) 
-            ++total_map_used;
-      }
-      if((total_map_used + _usedVertices[0]) >= (_usedVertices.size() - 1))
-         return true;
+     
    }
+   /*
+   * Check if map covers all a reaction molecules
+   */
+   total_map_used = 0;
+   for (int i = 1; i < _usedVertices.size(); ++i) {
+	   if (_usedVertices[i])
+		   ++total_map_used;
+   }
+   if (total_map_used >= (_usedVertices.size() - 1)) {
+	   reaction.getAAMArray(product).copy(product_mapping);
+	   return true;
+   }
+	   
    return false;
 }
 
@@ -1280,7 +1306,7 @@ void RSubstructureMcs::setUpFlags(const ReactionAutomapper& context) {
 bool RSubstructureMcs::searchSubstructure(Array<int>* map) {
    bool result = false;
 
-   if (_context.cancellation) {
+   if (_context.cancellation != nullptr) {
       try {
          result = SubstructureMcs::searchSubstructure(map);
       } catch (Exception&) {
@@ -1669,7 +1695,7 @@ int RSubstructureMcs::_searchSubstructure(EmbeddingEnumerator& emb_enum, const A
       return result;
 
    int proc = 1;
-   if (_context.cancellation) {
+   if (_context.cancellation != nullptr) {
       try {
          proc = emb_enum.process();
       } catch (Exception&) {
@@ -2008,7 +2034,7 @@ void RSubstructureMcs::_transposeInputMap(const Array<int>* map, Array<int>& inp
          }
       } else {
          for (int i = 0; i < map->size(); ++i) {
-            if (_invTransposition[i] >= 0)
+            if (_transposition[i] >= 0)
                input_map[_transposition[i]] = map->at(i);
          }
       }
@@ -2027,12 +2053,17 @@ int RSubstructureMcs::_getTransposedBondIndex(BaseMolecule& mol, int bond) const
    return result;
 }
 
-AAMCancellationWrapper::AAMCancellationWrapper(CancellationHandler* canc) {
-   _prev = setCancellationHandler(canc);
+AAMCancellationWrapper::AAMCancellationWrapper(CancellationHandler* canc):_contains(false) {
+    _prev = resetCancellationHandler(canc);
+    _contains = true;
 }
-
+void AAMCancellationWrapper::reset() {
+    resetCancellationHandler(_prev.release());
+    _contains = false;
+}
 AAMCancellationWrapper::~AAMCancellationWrapper() {
-     if(_prev) {
-        setCancellationHandler(_prev);
-     }
+    if(_contains) {
+        reset();
+    }
+    
 }

@@ -24,6 +24,8 @@
 #include "molecule/molecule_exact_matcher.h"
 #include "molecule/molecule_exact_substructure_matcher.h"
 
+#include "graph/dfs_walk.h"
+
 using namespace indigo;
 
 IMPL_ERROR(BaseMolecule, "molecule");
@@ -65,11 +67,22 @@ void BaseMolecule::clear ()
    _attachment_index.clear();
    sgroups.clear();
    tgroups.clear();
+   template_attachment_points.clear();
    Graph::clear();
    _hl_atoms.clear();
    _hl_bonds.clear();
    _bond_directions.clear();
    custom_collections.clear();
+
+   reaction_atom_mapping.clear();
+   reaction_atom_inversion.clear();
+   reaction_atom_exact_change.clear();
+   reaction_bond_reacting_center.clear();
+
+   use_scsr_sgroups_only = false;
+   remove_scsr_lgrp = false;
+   use_scsr_name = false;
+   expand_mod_templates = false;
 
    updateEditRevision();
 }
@@ -249,6 +262,34 @@ void BaseMolecule::_mergeWithSubmolecule_Sub (BaseMolecule &mol, const Array<int
    }
    else
       _xyz.zerofill();
+
+
+   reaction_atom_mapping.expandFill(vertexEnd(), 0);
+   reaction_atom_inversion.expandFill(vertexEnd(), 0);
+   reaction_atom_exact_change.expandFill(vertexEnd(), 0);
+   reaction_bond_reacting_center.expandFill(edgeEnd(), 0);
+
+   for (i = mol.vertexBegin(); i != mol.vertexEnd(); i = mol.vertexNext(i))
+   {
+      if (mapping[i] < 0)
+         continue;
+
+      reaction_atom_mapping[mapping[i]] = mol.reaction_atom_mapping[i];
+      reaction_atom_inversion[mapping[i]] = mol.reaction_atom_inversion[i];
+      reaction_atom_exact_change[mapping[i]] = mol.reaction_atom_exact_change[i];
+   }
+
+   for (int j = mol.edgeBegin(); j != mol.edgeEnd(); j = mol.edgeNext(j))
+   {
+      const Edge &edge = mol.getEdge(j);
+
+      if ( (mapping[edge.beg] > -1) && (mapping[edge.end] > -1) )
+      {
+         int bond_idx = findEdgeIndex(mapping[edge.beg], mapping[edge.end]);
+         if (bond_idx > -1)
+            reaction_bond_reacting_center[bond_idx] = mol.reaction_bond_reacting_center[j];
+      }
+   }
 
 
    _bond_directions.expandFill(mol.edgeEnd(), 0);
@@ -835,6 +876,13 @@ int BaseMolecule::_addBaseAtom ()
    _xyz.expand(idx + 1);
    _xyz[idx].zero();
 
+   reaction_atom_mapping.expand(idx + 1);
+   reaction_atom_mapping[idx] = 0;
+   reaction_atom_inversion.expand(idx + 1);
+   reaction_atom_inversion[idx] = 0;
+   reaction_atom_exact_change.expand(idx + 1);
+   reaction_atom_exact_change[idx] = 0;
+
    updateEditRevision();
 
    return idx;
@@ -843,6 +891,9 @@ int BaseMolecule::_addBaseAtom ()
 int BaseMolecule::_addBaseBond (int beg, int end)
 {
    int idx = addEdge(beg, end);
+
+   reaction_bond_reacting_center.expand(idx + 1);
+   reaction_bond_reacting_center[idx] = 0;
 
    cis_trans.registerBond(idx);
    updateEditRevision();
@@ -1206,15 +1257,23 @@ int BaseMolecule::transformFullCTABtoSCSR (ObjArray<TGroup> &templates)
 {
    int result = 0;
    QS_DEF(Molecule, fragment);
+   QS_DEF(Molecule, su_fragment);
+   QS_DEF(Molecule, rep);
    QS_DEF(Array<int>, added_templates);
    QS_DEF(Array<int>, mapping);
+   QS_DEF(Array<int>, su_mapping);
+   QS_DEF(Array<int>, tm_mapping);
    QS_DEF(Array<int>, remove_atoms);
    QS_DEF(Array<int>, base_sgs);
    QS_DEF(Array<int>, sgs);
+   QS_DEF(Array<int>, sgs_to_remove);
+   QS_DEF(Array<int>, atoms_to_remove);
    QS_DEF(Array<int>, ap_points_atoms);
    QS_DEF(StringPool, ap_points_ids);
    QS_DEF(Array<int>, ap_ids);
    QS_DEF(Array<int>, ignore_atoms);
+   QS_DEF(Array<char>, tg_alias);
+   QS_DEF(Array<char>, tg_name);
 
    added_templates.clear();
    ignore_atoms.clear();
@@ -1226,8 +1285,9 @@ int BaseMolecule::transformFullCTABtoSCSR (ObjArray<TGroup> &templates)
    for (auto i = 0; i < templates.size(); i++)
    {
       const TGroup &tg = templates.at(i);
+
       fragment.clear();
-      fragment.clone_KeepIndices(*tg.fragment);
+      fragment.clone_KeepIndices(*tg.fragment.get());
 
       sgs.clear();
       base_sgs.clear();
@@ -1269,6 +1329,226 @@ int BaseMolecule::transformFullCTABtoSCSR (ObjArray<TGroup> &templates)
 
       int count_occur = 0;
       ignore_atoms.clear();
+
+      sgs.clear();
+      sgroups.findSGroups(SGroup::SG_TYPE, SGroup::SG_TYPE_SUP, sgs);
+
+      sgs_to_remove.clear();
+      atoms_to_remove.clear();
+
+      for (int l = 0; l < sgs.size(); l++)
+      {
+         Superatom &su = (Superatom &) sgroups.getSGroup(sgs[l]);
+
+
+         if (su.sa_class.size() > 3 && strncmp(su.sa_class.ptr(), "LGRP", 4) == 0)
+         {
+            if (remove_scsr_lgrp)
+               sgs_to_remove.push(sgs[l]);
+            continue;
+         }   
+
+         if (use_scsr_name)
+         {
+            if ( (tg.tgroup_name.memcmp(su.subscript) == -1) &&
+                 (tg.tgroup_alias.memcmp(su.subscript) == -1) )
+            {
+               continue;
+            }
+         }
+
+         MoleculeExactMatcher matcher(fragment, this->asMolecule());
+
+
+         matcher.flags =  MoleculeExactMatcher::CONDITION_ELECTRONS |  // bond types, atom charges, valences, radicals must match
+                          MoleculeExactMatcher::CONDITION_ISOTOPE   |  // atom isotopes must match
+                          MoleculeExactMatcher::CONDITION_STEREO;      // tetrahedral and cis-trans configurations must match
+//                          MoleculeExactMatcher::CONDITION_FRAGMENTS;   // query fragments count must be equal to target fragments count
+
+
+
+         for (auto j : vertices())
+         {
+            if (su.atoms.find(j) == -1)
+               matcher.ignoreTargetAtom(j);
+         }
+
+         if (!matcher.find())
+            continue;
+
+         mapping.clear();
+         remove_atoms.clear();
+         mapping.copy(matcher.getQueryMapping(), fragment.vertexEnd());
+
+         for (int j = 0; j < mapping.size(); j++)
+         {
+            if (mapping[j] > -1)
+               remove_atoms.push(mapping[j]);
+         }
+
+         bool charged = false;
+         for (int j = 0; j < remove_atoms.size(); j++)
+         {
+            if (this->asMolecule().getAtomCharge(remove_atoms[j]) != 0)
+               charged = true;
+         }
+
+         if (charged)
+            continue;
+
+         int out_bonds = 0;
+         int used_att_points = 0;
+         for (int j = 0; j < remove_atoms.size(); j++)
+         {
+            const Vertex &v = getVertex(remove_atoms[j]);
+            for (int k = v.neiBegin(); k != v.neiEnd(); k = v.neiNext(k))
+            {
+               if (remove_atoms.find(v.neiVertex(k)) == -1)
+               {
+                  out_bonds++;
+                  for (int l = 0; l < ap_points_atoms.size(); l++)
+                  {
+                      int att_point_idx = mapping[ap_points_atoms[l]];
+                      if (att_point_idx == remove_atoms[j])
+                         used_att_points += 1;
+                  }
+               }
+            }
+         }
+
+         if ( (out_bonds > ap_points_atoms.size()) || (out_bonds > used_att_points) )
+         {
+            continue;
+         }
+
+         int idx = this->asMolecule().addAtom(-1);
+         this->asMolecule().setTemplateAtom(idx, tg.tgroup_name.ptr());
+         this->asMolecule().setTemplateAtomClass(idx, tg.tgroup_class.ptr());
+         seq_id++;
+         count_occur++;
+
+         for (int j = 0; j < ap_points_atoms.size(); j++)
+         {
+            int att_point_idx = mapping[ap_points_atoms[j]];
+            if (remove_atoms.find(att_point_idx) != -1)
+            {
+               const Vertex &v = getVertex(att_point_idx);
+               QS_DEF(Array<int>, neighbors);
+               neighbors.clear();
+               for (int k = v.neiBegin(); k != v.neiEnd(); k = v.neiNext(k))
+               {
+                  if (remove_atoms.find(v.neiVertex(k)) == -1)
+                  {
+                     neighbors.push(v.neiVertex(k));
+                  }
+               }
+               for (int k = 0; k < neighbors.size(); k++)
+               {
+                  if (findEdgeIndex(neighbors[k], att_point_idx) != -1)
+                  {
+                     const Vertex &v_n = getVertex(neighbors[k]);
+                     if (getAtomNumber(neighbors[k]) == ELEM_H)
+                     {
+                        remove_atoms.push(neighbors[k]);
+                        continue;
+                     }
+
+                     if (getAtomNumber(neighbors[k]) == ELEM_O && v_n.degree() == 1 && getAtomCharge(neighbors[k]) == 0) 
+                     {
+                        remove_atoms.push(neighbors[k]);
+                        continue;
+                     }
+
+                     if (findEdgeIndex(neighbors[k], idx) == -1)
+                        flipBond(neighbors[k], att_point_idx, idx);
+                     this->asMolecule().setTemplateAtomAttachmentOrder(idx, neighbors[k], ap_points_ids.at(ap_ids[j]));
+                     if (isTemplateAtom(neighbors[k]))
+                        _flipTemplateAtomAttachmentPoint(neighbors[k], att_point_idx, idx);
+                  }
+               }
+            }
+         }
+
+         QS_DEF(Vec2f, cp);
+         QS_DEF(Vec3f, p);
+         p.set(0, 0, 0);
+         getAtomsCenterPoint(remove_atoms, cp);
+         p.x = cp.x;
+         p.y = cp.y;
+         setAtomXyz(idx, p);
+
+
+         sgs_to_remove.push(sgs[l]);
+         atoms_to_remove.concat(remove_atoms);
+      }
+      
+      if (count_occur > 0)
+         added_templates.push(i);
+
+      for (int j = 0; j < sgs_to_remove.size(); j++)
+         sgroups.remove(sgs_to_remove[j]);
+
+      if (atoms_to_remove.size() > 0)
+         removeAtoms(atoms_to_remove);
+   }
+
+   if (use_scsr_sgroups_only)
+   {
+      for (auto i = 0; i < added_templates.size(); i++)
+      {
+         _addTemplate(templates.at(added_templates[i]));
+      }
+      return result;
+   }
+
+   for (auto i = 0; i < templates.size(); i++)
+   {
+      const TGroup &tg = templates.at(i);
+
+      fragment.clear();
+      fragment.clone_KeepIndices(*tg.fragment.get());
+
+      sgs.clear();
+      base_sgs.clear();
+      fragment.sgroups.findSGroups(SGroup::SG_CLASS, "LGRP", sgs);
+      for (int j = fragment.sgroups.begin(); j != fragment.sgroups.end(); j = fragment.sgroups.next(j))
+      {
+         if (sgs.find(j) == -1)
+            base_sgs.push(j);
+      }
+
+      ap_points_atoms.clear();
+      ap_points_ids.clear();
+      ap_ids.clear();
+      for (int j = 0; j < base_sgs.size(); j++)
+      {
+         SGroup &sg = fragment.sgroups.getSGroup(base_sgs[j]);
+         if (sg.sgroup_type == SGroup::SG_TYPE_SUP)
+         {
+            Superatom &su = (Superatom &)sg;
+         
+            if (su.attachment_points.size() > 0)
+            {
+               for (int k = su.attachment_points.begin(); k < su.attachment_points.end(); k = su.attachment_points.next(k))
+               {
+                  Superatom::_AttachmentPoint &ap = su.attachment_points.at(k);
+                  ap_points_atoms.push(ap.aidx);
+                  ap_ids.push(ap_points_ids.add(ap.apid));
+               }
+            }
+         }
+         else
+            throw Error("Wrong template structure was found (base SGroup is not Superatom type)");
+      }
+
+      for (int j = 0; j < sgs.size(); j++)
+      {
+         fragment.removeSGroupWithBasis(sgs[j]);
+      }
+
+      int count_occur = 0;
+      ignore_atoms.clear();
+
       for (;;)
       {
          MoleculeExactSubstructureMatcher matcher(fragment, this->asMolecule());
@@ -1286,10 +1566,10 @@ int BaseMolecule::transformFullCTABtoSCSR (ObjArray<TGroup> &templates)
          {
             if (mapping[j] > -1)
                remove_atoms.push(mapping[j]);
-              
          }
 
          int out_bonds = 0;
+         int used_att_points = 0;
          for (int j = 0; j < remove_atoms.size(); j++)
          {
             const Vertex &v = getVertex(remove_atoms[j]);
@@ -1298,11 +1578,30 @@ int BaseMolecule::transformFullCTABtoSCSR (ObjArray<TGroup> &templates)
                if (remove_atoms.find(v.neiVertex(k)) == -1)
                {
                   out_bonds++;
+                  for (int l = 0; l < ap_points_atoms.size(); l++)
+                  {
+                      int att_point_idx = mapping[ap_points_atoms[l]];
+                      if (att_point_idx == remove_atoms[j])
+                         used_att_points += 1;
+                  }
                }
             }
          }
 
-         if (out_bonds > ap_points_atoms.size())
+         if ( (out_bonds > ap_points_atoms.size()) || (out_bonds > used_att_points) )
+         {
+            ignore_atoms.concat(remove_atoms);
+            continue;
+         }
+
+         bool charged = false;
+         for (int j = 0; j < remove_atoms.size(); j++)
+         {
+            if (this->asMolecule().getAtomCharge(remove_atoms[j]) != 0)
+               charged = true;
+         }
+
+         if (charged)
          {
             ignore_atoms.concat(remove_atoms);
             continue;
@@ -1334,7 +1633,21 @@ int BaseMolecule::transformFullCTABtoSCSR (ObjArray<TGroup> &templates)
                {
                   if (findEdgeIndex(neighbors[k], att_point_idx) != -1)
                   {
-                     flipBond(neighbors[k], att_point_idx, idx);
+                     const Vertex &v_n = getVertex(neighbors[k]);
+                     if (getAtomNumber(neighbors[k]) == ELEM_H)
+                     {
+                        remove_atoms.push(neighbors[k]);
+                        continue;
+                     }
+
+                     if (getAtomNumber(neighbors[k]) == ELEM_O && v_n.degree() == 1 && getAtomCharge(neighbors[k]) == 0) 
+                     {
+                        remove_atoms.push(neighbors[k]);
+                        continue;
+                     }
+
+                     if (findEdgeIndex(neighbors[k], idx) == -1)
+                        flipBond(neighbors[k], att_point_idx, idx);
                      this->asMolecule().setTemplateAtomAttachmentOrder(idx, neighbors[k], ap_points_ids.at(ap_ids[j]));
                      if (isTemplateAtom(neighbors[k]))
                         _flipTemplateAtomAttachmentPoint(neighbors[k], att_point_idx, idx);
@@ -1351,10 +1664,18 @@ int BaseMolecule::transformFullCTABtoSCSR (ObjArray<TGroup> &templates)
          p.y = cp.y;
          setAtomXyz(idx, p);
 
+         sgs.clear();
+         sgroups.findSGroups(SGroup::SG_ATOMS, remove_atoms, sgs);
+             
+         for (int j = 0; j < sgs.size(); j++)
+         {
+            sgroups.remove((sgs[j]));
+         }
+
          removeAtoms(remove_atoms);
       }
     
-      if (count_occur > 0)
+      if (count_occur > 0 && added_templates.find(i) == -1)
          added_templates.push(i);
    }
 
@@ -1363,7 +1684,197 @@ int BaseMolecule::transformFullCTABtoSCSR (ObjArray<TGroup> &templates)
       _addTemplate(templates.at(added_templates[i]));
    }
 
+   if (added_templates.size() > 0)
+   {
+      _fillTemplateSeqIds();
+   }
+
+   if (expand_mod_templates)
+   {
+      QS_DEF(Array<int>, tinds);
+      tinds.clear();
+   
+      for (auto i : vertices())
+      {
+         if (isTemplateAtom(i))
+         {
+            const Vertex &v = getVertex(i);
+            for (int k = v.neiBegin(); k != v.neiEnd(); k = v.neiNext(k))
+            {
+               if (!isTemplateAtom(v.neiVertex(k)))
+               {
+                  const Vertex &v_n = getVertex(v.neiVertex(k));
+   
+                  if (getAtomNumber(v.neiVertex(k)) == ELEM_H)
+                     continue;
+   
+                  if (getAtomNumber(v.neiVertex(k)) == ELEM_O && v_n.degree() == 1 && getAtomCharge(v.neiVertex(k)) == 0) 
+                     continue;
+                       
+                  tinds.push(i);
+                  break;
+               }
+            }
+         }
+      }
+   
+      for (auto i = 0; i < tinds.size(); i++)
+      {
+         _transformTGroupToSGroup(tinds[i]);
+      }
+   
+      if (tinds.size() > 0)
+      {
+         removeAtoms(tinds);
+      }
+   }
    return result;
+}
+
+void BaseMolecule::_fillTemplateSeqIds ()
+{
+   QS_DEF(Array<int>, ignored_vertices);
+   QS_DEF(Array<int>, vertex_ranks);
+   QS_DEF(Molecule, tmp);
+
+   tmp.clear();
+   tmp.clone_KeepIndices(*this);
+
+   ignored_vertices.clear_resize(tmp.vertexEnd());
+   ignored_vertices.zerofill();
+
+   QS_DEF(Array<char>, left_apid);
+   QS_DEF(Array<char>, right_apid);
+   QS_DEF(Array<char>, xlink_apid);
+   left_apid.readString("Al", true);
+   right_apid.readString("Br", true);
+   xlink_apid.readString("Cx", true);
+
+   vertex_ranks.clear_resize(tmp.vertexEnd());
+   vertex_ranks.zerofill();
+
+   for (auto i : tmp.vertices())
+      vertex_ranks[i] = i;
+
+   for (auto i : tmp.vertices())
+   {
+      if (!tmp.isTemplateAtom(i))
+      {
+         ignored_vertices[i] = 1;
+      }    
+      else
+      {
+         int left_neib = tmp.getTemplateAtomAttachmentPointById (i, left_apid);
+         int right_neib = tmp.getTemplateAtomAttachmentPointById (i, right_apid);
+
+         if (left_neib == -1) 
+         {
+            vertex_ranks[i] = -2;
+         }
+         else if (!tmp.isTemplateAtom(left_neib) && (right_neib != -1) )
+         {
+            vertex_ranks[i] = -1;
+         }
+
+         int xlink_neib = tmp.getTemplateAtomAttachmentPointById (i, xlink_apid);
+         if (xlink_neib > -1)
+         {
+            int eidx = tmp.findEdgeIndex(i, xlink_neib);
+            if (eidx > -1)
+               tmp.removeEdge(eidx);
+         }
+      }
+   }
+
+   DfsWalk walk(tmp);
+
+   walk.ignored_vertices = ignored_vertices.ptr();
+   walk.vertex_ranks = vertex_ranks.ptr();
+
+   walk.walk();
+
+   const Array<DfsWalk::SeqElem> &v_seq = walk.getSequence();
+
+   QS_DEF(Array<int>, branch_counters);
+   QS_DEF(Array<int>, cycle_numbers);
+   QS_DEF(Array<int>, atom_sequence);
+
+   branch_counters.clear_resize(tmp.vertexEnd());
+   branch_counters.zerofill();
+   cycle_numbers.clear();
+   atom_sequence.clear();
+
+   /* first template */
+   if (v_seq.size() > 0)
+   {
+      atom_sequence.push(v_seq[0].idx);
+      
+      int j, openings = walk.numOpenings(v_seq[0].idx);
+
+      for (j = 0; j < openings; j++)
+      {
+         cycle_numbers.push(v_seq[0].idx);
+      }
+   }
+
+   int i, j, k;
+
+   for (i = 1; i < v_seq.size(); i++)
+   {
+      int v_idx = v_seq[i].idx;
+      int e_idx = v_seq[i].parent_edge;
+      int v_prev_idx = v_seq[i].parent_vertex;
+      bool write_template = true;
+
+      if (v_prev_idx >= 0)
+      {
+         int branches = walk.numBranches(v_prev_idx);
+
+         branch_counters[v_prev_idx]++;
+
+         if (branch_counters[v_prev_idx] > branches)
+            throw Error("unexpected branch");
+
+         if (walk.isClosure(e_idx))
+         {
+            for (j = 0; j < cycle_numbers.size(); j++)
+               if (cycle_numbers[j] == v_idx)
+                  break;
+
+            if (j == cycle_numbers.size())
+               throw Error("cycle number not found");
+
+            cycle_numbers[j] = -1;
+            write_template = false;
+         }
+      }
+
+      if (write_template)
+      {
+         atom_sequence.push(v_idx);
+         
+         int openings = walk.numOpenings(v_idx);
+
+         for (j = 0; j < openings; j++)
+         {
+            for (k = 0; k < cycle_numbers.size(); k++)
+               if (cycle_numbers[k] == -1)
+                  break;
+            if (k == cycle_numbers.size())
+               cycle_numbers.push(v_idx);
+            else
+               cycle_numbers[k] = v_idx;
+         }
+      }
+   }
+
+   int seq_id = 1;
+   for (i = 0; i < atom_sequence.size(); i++)
+   {
+      int v_idx = atom_sequence[i];
+      this->asMolecule().setTemplateAtomSeqid(v_idx, seq_id);
+      seq_id += 1;
+   }
 }
 
 int BaseMolecule::_addTemplate (TGroup &tgroup)
@@ -1379,6 +1890,7 @@ int BaseMolecule::_transformTGroupToSGroup (int idx)
    int result = 0;
    QS_DEF(Molecule, fragment);
    QS_DEF(Array<int>, sgs);
+   QS_DEF(Array<int>, base_sgs);
    QS_DEF(Array<int>, mapping);
    QS_DEF(Array<int>, att_atoms);
    QS_DEF(Array<int>, tg_atoms);
@@ -1387,17 +1899,24 @@ int BaseMolecule::_transformTGroupToSGroup (int idx)
    int tg_idx = tgroups.findTGroup(getTemplateAtom(idx));
    TGroup &tgroup = tgroups.getTGroup(tg_idx);
    fragment.clear();
-   fragment.clone_KeepIndices(*tgroup.fragment);
+   fragment.clone_KeepIndices(*tgroup.fragment.get());
 
    sgs.clear();
    att_atoms.clear();
    tg_atoms.clear();
    lvgroups.clear();
-   fragment.sgroups.findSGroups(SGroup::SG_LABEL, getTemplateAtom(idx), sgs);
-   if (sgs.size() > 1)
+   base_sgs.clear();
+   fragment.sgroups.findSGroups(SGroup::SG_CLASS, "LGRP", sgs);
+   for (int j = fragment.sgroups.begin(); j != fragment.sgroups.end(); j = fragment.sgroups.next(j))
+   {
+      if (sgs.find(j) == -1)
+         base_sgs.push(j);
+   }
+
+   if (base_sgs.size() > 1)
       throw Error("transformTGroupToSGroup(): wrong template structure found (more then one base SGroup detected)");
    
-   SGroup &sg = fragment.sgroups.getSGroup(sgs[0]);
+   SGroup &sg = fragment.sgroups.getSGroup(base_sgs[0]);
    if (sg.sgroup_type != SGroup::SG_TYPE_SUP)
       throw Error("transformTGroupToSGroup(): wrong template structure found (base SGroup is not Superatom type)");
 
@@ -1419,14 +1938,13 @@ int BaseMolecule::_transformTGroupToSGroup (int idx)
       }
    }
 
-   sgs.clear();
-   fragment.sgroups.findSGroups(SGroup::SG_CLASS, "LGRP", sgs);
    for (int i = 0; i < sgs.size(); i++)
    {
       SGroup &lvg = fragment.sgroups.getSGroup(sgs[i]);
       for (int j = 0; j < lvgroups.size(); j++)
       {
          if (lvg.atoms.find(lvgroups[j]) > -1)
+//              ( (lvg.atoms.size() == 1 && fragment.getAtomNumber(lvg.atoms[0]) == ELEM_H) ) )
             fragment.removeSGroupWithBasis(sgs[i]);
       }
    }
@@ -1436,14 +1954,55 @@ int BaseMolecule::_transformTGroupToSGroup (int idx)
    for (auto i : fragment.vertices())
    {
       int aidx = mapping[i];
-      setAtomXyz(aidx, getAtomXyz(idx));
+      if (aidx > -1)
+      {
+         setAtomXyz(aidx, getAtomXyz(idx));
+      }
    }
 
-   for (int i = 0; i < att_atoms.size(); i++)
+   QS_DEF(Array<int>, added_atoms);
+   added_atoms.clear();
+
+   for (auto i = 0; i < su.atoms.size(); i++)
    {
-      flipBond(att_atoms[i], idx, mapping[tg_atoms[i]]);
-      if (isTemplateAtom(att_atoms[i]))
-         _flipTemplateAtomAttachmentPoint(att_atoms[i], idx, mapping[tg_atoms[i]]);
+      int aidx = mapping[su.atoms[i]];
+      if (aidx > -1)
+      {
+         added_atoms.push(aidx);
+      }
+   }
+
+   base_sgs.clear();
+   sgroups.findSGroups(SGroup::SG_ATOMS, added_atoms, base_sgs);
+   if (base_sgs.size() == 1)
+   {
+      SGroup &sg = sgroups.getSGroup(base_sgs[0]);
+      if (sg.sgroup_type == SGroup::SG_TYPE_SUP)
+      {
+         Superatom &su = (Superatom &)sg;
+         su.seqid = getTemplateAtomSeqid (idx);
+
+         for (int i = 0; i < att_atoms.size(); i++)
+         {
+            flipBond(att_atoms[i], idx, mapping[tg_atoms[i]]);
+            if (isTemplateAtom(att_atoms[i]))
+               _flipTemplateAtomAttachmentPoint(att_atoms[i], idx, mapping[tg_atoms[i]]);
+
+            int bond_idx = findEdgeIndex(att_atoms[i], mapping[tg_atoms[i]]);
+            if (bond_idx > -1)
+            {
+               su.bonds.push(bond_idx);
+
+               for (int j = su.attachment_points.begin(); j < su.attachment_points.end(); j = su.attachment_points.next(j))
+               {
+                  Superatom::_AttachmentPoint &ap = su.attachment_points.at(j);
+         
+                  if (ap.aidx == mapping[tg_atoms[i]])
+                     ap.lvidx = att_atoms[i];
+               }
+            }
+         }
+      }
    }
 
    return result;
@@ -1925,4 +2484,85 @@ int BaseMolecule::atomCode (int vertex_idx)
 int BaseMolecule::bondCode (int edge_idx)
 {
    return getBondOrder(edge_idx);
+}
+
+
+int BaseMolecule::transformHELMtoSGroups(Array<char> &helm_class, Array<char> &name, Array<char> &code, Array<char> &natreplace,
+       StringPool &r_names)
+{
+   QS_DEF(Array<int>, sg_atoms);
+   sg_atoms.clear();
+
+   if (countRSites() > r_names.size())
+      throw Error("transformHELMtoSGroups: inconsistent number of R-sites and R-groups");
+
+   for (auto i = vertexBegin(); i != vertexEnd(); i = vertexNext(i))
+   {
+      if (isRSite(i))
+         continue;
+      else
+         sg_atoms.push(i);
+   }
+
+   if (sg_atoms.size() == 0)
+      throw Error("transformHELMtoSGroups: atoms for base S-group are not found");
+
+   int idx = sgroups.addSGroup("SUP");      
+   Superatom &sg = (Superatom &)sgroups.getSGroup(idx);
+   sg.atoms.copy(sg_atoms);
+   sg.subscript.copy(name);
+   if (helm_class.size() > 6 && strncmp(helm_class.ptr(), "PEPTIDE", 7) == 0)
+      sg.sa_class.readString("AA", true);
+   else
+      sg.sa_class.copy(helm_class);
+   sg.sa_natreplace.copy(natreplace);
+
+   int idap;
+
+   for (auto i = vertexBegin(); i != vertexEnd(); i = vertexNext(i))
+   {
+      if (isRSite(i))
+      {
+         QS_DEF(Array<int>, rg_list);
+         getAllowedRGroups(i, rg_list);
+         int r_num = rg_list[0] - 1;
+
+         int lvidx = sgroups.addSGroup("SUP");      
+         Superatom &lvsg = (Superatom &)sgroups.getSGroup(lvidx);
+         lvsg.atoms.push(i);
+         if (strncmp(r_names.at(r_num), "O", 1) == 0 && strlen(r_names.at(r_num)) == 1)
+            lvsg.subscript.readString("OH", true);
+         else
+            lvsg.subscript.readString(r_names.at(r_num), true);
+         lvsg.sa_class.readString("LGRP", true);
+         this->asMolecule().resetAtom(i, Element::fromString(r_names.at(r_num)));
+
+         int ap_idx;
+         const Vertex &v = getVertex(i);
+         for (int k = v.neiBegin(); k != v.neiEnd(); k = v.neiNext(k))
+         {
+            if (sg_atoms.find(v.neiVertex(k)) != -1)
+            {
+               ap_idx = v.neiVertex(k);
+               int b_idx = findEdgeIndex(v.neiVertex(k), i);
+               sg.bonds.push(b_idx);
+               lvsg.bonds.push(b_idx);
+            }
+         }
+
+         int idap = sg.attachment_points.add();
+         Superatom::_AttachmentPoint &ap = sg.attachment_points.at(idap);
+         ap.aidx = ap_idx;
+         ap.lvidx = i;
+         if (r_num == 0)
+            ap.apid.readString("Al", true);
+         else if (r_num == 1)
+            ap.apid.readString("Br", true);
+         else if (r_num == 2)
+            ap.apid.readString("Cx", true);
+         else if (r_num == 3)
+            ap.apid.readString("Dx", true);
+      }
+   }
+   return 1;
 }

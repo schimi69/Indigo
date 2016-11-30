@@ -73,6 +73,16 @@ namespace com.epam.indigo
             return result;
         }
 
+        public double checkResult(double result)
+        {
+            if (result < 0)
+            {
+                throw new IndigoException(new String(_indigo_lib.indigoGetLastError()));
+            }
+
+            return result;
+        }
+
         public int checkResult(int result)
         {
             if (result < 0)
@@ -179,6 +189,12 @@ namespace com.epam.indigo
         {
             setSessionID();
             checkResult(_indigo_lib.indigoSetOptionColor(name, value.R / 255.0f, value.G / 255.0f, value.B / 255.0f));
+        }
+
+        public void resetOptions()
+        {
+            setSessionID();
+            checkResult(_indigo_lib.indigoResetOptions());
         }
 
         public IndigoObject writeFile(String filename)
@@ -327,11 +343,10 @@ namespace com.epam.indigo
 
         public IndigoObject exactMatch(IndigoObject obj1, IndigoObject obj2, string flags)
         {
-            setSessionID();
-
             if (flags == null)
                 flags = "";
 
+            setSessionID();
             int match = checkResult(_indigo_lib.indigoExactMatch(obj1.self, obj2.self, flags));
 
             if (match == 0)
@@ -506,7 +521,6 @@ namespace com.epam.indigo
 
         public IndigoObject reactionProductEnumerate(IndigoObject reaction, IEnumerable monomers)
         {
-            setSessionID();
             IndigoObject indigoArrayArray = createArray();
             foreach (IEnumerable iter in monomers) {
                 IndigoObject indigoArray = createArray();
@@ -515,6 +529,7 @@ namespace com.epam.indigo
                 }
                 indigoArrayArray.arrayAdd(indigoArray);
             }
+            setSessionID();
             return new IndigoObject(this, checkResult(_indigo_lib.indigoReactionProductEnumerate(reaction.self, indigoArrayArray.self)));
         }
 
@@ -613,6 +628,17 @@ namespace com.epam.indigo
             return new IndigoObject(this, result, molecule);
         }
 
+        public IndigoObject transformHELMtoSCSR(IndigoObject item)
+        {
+            setSessionID();
+            int result = checkResult(_indigo_lib.indigoTransformHELMtoSCSR(item.self));
+            if (result == 0)
+            {
+                return null;
+            }
+            return new IndigoObject(this, result);
+        }
+
         public void free(int id)
         {
             setSessionID();
@@ -649,29 +675,13 @@ namespace com.epam.indigo
             {
                 case PlatformID.Win32NT:
                     libraryName = "indigo.dll";
-                    bool vs2010 = true;
-                    bool vs2012 = true;
+
                     bool vs2013 = true;
                     bool vs2015 = true;
+
                     try
                     {
-                       dll_loader.loadLibrary(lib_path, "msvcr100.dll", "com.epam.indigo.Properties.ResourcesWin2010", false);
-                    }
-                    catch 
-                    {
-                        vs2010 = false;
-                    }
-                    try
-                    {
-                       dll_loader.loadLibrary(lib_path, "msvcr110.dll", "com.epam.indigo.Properties.ResourcesWin2012", false);
-                    }
-                    catch 
-                    {
-                        vs2012 = false;
-                    }
-                    try
-                    {
-                        dll_loader.loadLibrary(lib_path, "msvcr120.dll", "com.epam.indigo.Properties.ResourcesWin2013", false);
+                       dll_loader.loadLibrary(lib_path, "msvcr120.dll", "com.epam.indigo.Properties.ResourcesWin2013", false);
                     }
                     catch
                     {
@@ -679,38 +689,26 @@ namespace com.epam.indigo
                     }
                     try
                     {
-                        dll_loader.loadLibrary(lib_path, "vcruntime140.dll", "com.epam.indigo.Properties.ResourcesWin2015", false);
+                       dll_loader.loadLibrary(lib_path, "vcruntime140.dll", "com.epam.indigo.Properties.ResourcesWin2015", false);
                     }
                     catch
                     {
                         vs2015 = false;
                     }
 
-                    if (vs2010) 
+                    if (vs2013)
                     {
-                       dll_loader.loadLibrary(lib_path, "msvcr100.dll", "com.epam.indigo.Properties.ResourcesWin2010", false);
-                       dll_loader.loadLibrary(lib_path, "msvcp100.dll", "com.epam.indigo.Properties.ResourcesWin2010", false);
-                       dll_loader.loadLibrary(lib_path, libraryName, "com.epam.indigo.Properties.ResourcesWin2010", false);
-                    }
-                    else if (vs2012)                    
-                    {
-                       dll_loader.loadLibrary(lib_path, "msvcr110.dll", "com.epam.indigo.Properties.ResourcesWin2012", false);
-                       dll_loader.loadLibrary(lib_path, "msvcp110.dll", "com.epam.indigo.Properties.ResourcesWin2012", false);
-                       dll_loader.loadLibrary(lib_path, libraryName, "com.epam.indigo.Properties.ResourcesWin2012", false);
-                    }
-                    else if (vs2013)
-                    {
-                        dll_loader.loadLibrary(lib_path, "msvcr120.dll", "com.epam.indigo.Properties.ResourcesWin2013", false);
-                        dll_loader.loadLibrary(lib_path, "msvcp120.dll", "com.epam.indigo.Properties.ResourcesWin2013", false);
-                        dll_loader.loadLibrary(lib_path, libraryName, "com.epam.indigo.Properties.ResourcesWin2013", false);
+                       dll_loader.loadLibrary(lib_path, "msvcr120.dll", "com.epam.indigo.Properties.ResourcesWin2013", false);
+                       dll_loader.loadLibrary(lib_path, "msvcp120.dll", "com.epam.indigo.Properties.ResourcesWin2013", false);
+                       dll_loader.loadLibrary(lib_path, libraryName, "com.epam.indigo.Properties.ResourcesWin2013", false);
                     }
                     else if (vs2015)
                     {
-                        dll_loader.loadLibrary(lib_path, "vcruntime140.dll", "com.epam.indigo.Properties.ResourcesWin2015", false);
-                        dll_loader.loadLibrary(lib_path, "msvcp140.dll", "com.epam.indigo.Properties.ResourcesWin2015", false);
-                        dll_loader.loadLibrary(lib_path, libraryName, "com.epam.indigo.Properties.ResourcesWin2015", false);
+                       dll_loader.loadLibrary(lib_path, "vcruntime140.dll", "com.epam.indigo.Properties.ResourcesWin2015", false);
+                       dll_loader.loadLibrary(lib_path, "msvcp140.dll", "com.epam.indigo.Properties.ResourcesWin2015", false);
+                       dll_loader.loadLibrary(lib_path, libraryName, "com.epam.indigo.Properties.ResourcesWin2015", false);
                     }
-                    
+
                     break;
                 case PlatformID.Unix:
                     if (IndigoDllLoader.isMac())

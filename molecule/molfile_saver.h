@@ -67,6 +67,15 @@ public:
       int          ref_cip1;
       int          ref_cip2;
       bool         use_rule_5;
+      
+      inline void clear() {
+         mol = 0;
+         cip_desc = 0;
+         used1 = 0;
+         used2 = 0;
+         ref_cip1=0;
+         ref_cip2=0;
+      }
    };
 
    MolfileSaver (Output &output);
@@ -85,12 +94,6 @@ public:
    bool add_implicit_h;  // If true then MRV_IMPLICIT_H Data S-groups will be added for saving
                          // the number of implicit H for aromatic atoms
                          // (if it is required for correct de-aromatization) (default value is true)
-
-   // optional parameters for reaction
-   const Array<int>* reactionAtomMapping;
-   const Array<int>* reactionAtomInversion;
-   const Array<int>* reactionAtomExactChange;
-   const Array<int>* reactionBondReactingCenter;
 
    DECL_ERROR;
    

@@ -107,6 +107,23 @@ CEXPORT int indigoSetOptionXY (const char *name, int x, int y)
    INDIGO_END(-1)
 }
 
+CEXPORT int indigoResetOptions ()
+{
+   INDIGO_BEGIN
+   {
+      if (indigoGetOptionManager().hasOptionHandler("reset-basic-options"))
+      {
+         indigoGetOptionManager().callOptionHandlerVoid("reset-basic-options");
+      }
+      if(indigoGetOptionManager().hasOptionHandler("reset-render-options"))
+      {
+         indigoGetOptionManager().callOptionHandlerVoid("reset-render-options");
+      }
+      return 1;
+   }
+   INDIGO_END(-1)
+}
+
 void _indigoCheckBadValence (Molecule &mol)
 {
    mol.restoreAromaticHydrogens();
@@ -161,6 +178,24 @@ CEXPORT const char * indigoCheckBadValence (int handle)
                Molecule &mol = rxn.getMolecule(j);
                _indigoCheckBadValence(mol);
             }
+         }
+         catch (Exception &e)
+         {
+            auto &tmp = self.getThreadTmpData();
+            tmp.string.readString(e.message(), true);
+            return tmp.string.ptr();
+         }
+      }
+      else if (IndigoAtom::is(obj))
+      {
+         IndigoAtom &ia = IndigoAtom::cast(obj);
+   
+         if (ia.mol.isPseudoAtom(ia.idx) || ia.mol.isRSite(ia.idx) || ia.mol.isTemplateAtom(ia.idx) )
+            return "";
+   
+         try
+         {
+            int res = ia.mol.getAtomValence(ia.idx);
          }
          catch (Exception &e)
          {
@@ -272,6 +307,33 @@ CEXPORT const char * indigoCanonicalSmiles (int item)
    }
    INDIGO_END(0);
 }
+
+CEXPORT const char * indigoSmarts (int item)
+{
+   INDIGO_BEGIN
+   {
+      IndigoObject &obj = self.getObject(item);
+      auto &tmp = self.getThreadTmpData();
+      IndigoSmilesSaver::generateSmarts(obj, tmp.string);
+
+      return tmp.string.ptr();
+   }
+   INDIGO_END(0);
+}
+
+CEXPORT const char * indigoCanonicalSmarts (int item)
+{
+   INDIGO_BEGIN
+   {
+      IndigoObject &obj = self.getObject(item);
+      auto &tmp = self.getThreadTmpData();
+      IndigoCanonicalSmilesSaver::generateSmarts(obj, tmp.string);
+
+      return tmp.string.ptr();
+   }
+   INDIGO_END(0);
+}
+
 
 CEXPORT int indigoUnfoldHydrogens (int item)
 {
@@ -910,6 +972,88 @@ CEXPORT int indigoIsPossibleFischerProjection (int object, const char *options)
       else
          throw IndigoError("indigoIsPossibleFischerProjection: expected molecule, got %s", obj.debugInfo());
       return -1;
+   }
+   INDIGO_END(-1);
+}
+
+void _parseHelmRgroupsNames(Array<char> &helm_caps, StringPool &r_names)
+{
+   BufferScanner strscan(helm_caps);
+   QS_DEF(Array<char>, r_desc);
+   QS_DEF(Array<char>, r_name);
+   QS_DEF(Array<char>, delim);
+   r_desc.clear();
+   r_name.clear();
+   delim.clear();
+   r_names.clear();
+
+   delim.push(',');
+   delim.push(0);
+
+   while (!strscan.isEOF())
+   {
+      strscan.readWord(r_desc, delim.ptr());
+      if (strncmp(r_desc.ptr(), "[R", 2) == 0)
+      {
+         BufferScanner r_scan(r_desc.ptr());
+         r_scan.skip(2);
+         int rg_id = r_scan.readInt1();
+         r_scan.readAll(r_name);
+         while ((rg_id - 1) > r_names.size())
+           r_names.add(1);
+         r_names.add(r_name);
+      }
+      if (!strscan.isEOF())
+         strscan.skip(1);
+   }
+}
+
+CEXPORT int indigoTransformHELMtoSCSR (int object)
+{
+   INDIGO_BEGIN
+   {
+      QS_DEF(Array<char>, helm_class);
+      QS_DEF(Array<char>, helm_name);
+      QS_DEF(Array<char>, helm_code);
+      QS_DEF(Array<char>, helm_natreplace);
+      QS_DEF(Array<char>, helm_caps);
+      QS_DEF(Array<char>, helm_type);
+      QS_DEF(StringPool, r_names);
+
+
+      IndigoObject &obj = self.getObject(object);
+
+      if (obj.type == IndigoObject::RDF_MOLECULE)
+      {
+         AutoPtr<IndigoMolecule> im(new IndigoMolecule());
+         im->mol.clone(obj.getMolecule(), 0, 0);
+
+         auto& props = obj.getProperties();
+
+         if (props.contains("HELM_CLASS") && props.contains("HELM_NAME") && props.contains("HELM_CAPS") )
+         {
+            helm_class.readString(props.at("HELM_CLASS"), true);
+            helm_name.readString(props.at("HELM_NAME"), true);
+            helm_caps.readString(props.at("HELM_CAPS"), true);
+         }
+         else
+            throw IndigoError("indigoTransformHELMtoSCSR: required properties not found.");
+
+         if (props.contains("HELM_CODE"))
+            helm_code.readString(props.at("HELM_CODE"), true);
+         if (props.contains("HELM_NATREPLACE"))
+            helm_natreplace.readString(props.at("HELM_NATREPLACE"), true);
+         if (props.contains("HELM_TYPE"))
+            helm_type.readString(props.at("HELM_TYPE"), true);
+
+         _parseHelmRgroupsNames(helm_caps, r_names);
+
+         im->mol.transformHELMtoSGroups(helm_class, helm_name, helm_code, helm_natreplace, r_names);
+
+         return self.addObject(im.release());
+      }
+      else
+         throw IndigoError("indigoTransformHELMtoSCSR: expected molecule, got %s", obj.debugInfo());
    }
    INDIGO_END(-1);
 }

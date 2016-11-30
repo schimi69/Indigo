@@ -64,9 +64,9 @@ void TimeoutCancellationHandler::reset (int mseconds)
 class CancellationHandlerWrapper
 {
 public:
-   CancellationHandlerWrapper () : handler(0) {}
+   CancellationHandlerWrapper () : handler(nullptr) {}
 
-   CancellationHandler* handler;
+   std::unique_ptr<CancellationHandler> handler;
 };
 
 static _SessionLocalContainer<CancellationHandlerWrapper> cancellation_handler;
@@ -74,23 +74,23 @@ static _SessionLocalContainer<CancellationHandlerWrapper> cancellation_handler;
 CancellationHandler* getCancellationHandler ()
 {
    CancellationHandlerWrapper &wrapper = cancellation_handler.getLocalCopy();
-   return wrapper.handler;
+   return wrapper.handler.get();
 }
 
-CancellationHandler* setCancellationHandler (CancellationHandler* handler)
+std::unique_ptr<CancellationHandler> resetCancellationHandler (CancellationHandler* handler)
 {
    CancellationHandlerWrapper &wrapper = cancellation_handler.getLocalCopy();
-   CancellationHandler* prev = wrapper.handler;
-   wrapper.handler = handler;
+   std::unique_ptr<CancellationHandler> prev (wrapper.handler.release());
+   wrapper.handler.reset(handler);
    return prev;
 }
 
-AutoCancellationHandler::AutoCancellationHandler(CancellationHandler& hand) {
-   _prev = setCancellationHandler(&hand);
-}
-
-AutoCancellationHandler::~AutoCancellationHandler() {
-   setCancellationHandler(_prev);
-}
+//AutoCancellationHandler::AutoCancellationHandler(CancellationHandler& hand) {
+//   _prev = setCancellationHandler(&hand);
+//}
+//
+//AutoCancellationHandler::~AutoCancellationHandler() {
+//   setCancellationHandler(_prev);
+//}
 
 }
