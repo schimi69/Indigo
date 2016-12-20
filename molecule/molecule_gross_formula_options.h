@@ -1,54 +1,44 @@
 /****************************************************************************
  * Copyright (C) 2009-2015 EPAM Systems
- *
+ * 
  * This file is part of Indigo toolkit.
- *
+ * 
  * This file may be distributed and/or modified under the terms of the
  * GNU General Public License version 3 as published by the Free Software
  * Foundation and appearing in the file LICENSE.GPL included in the
  * packaging of this file.
- *
+ * 
  * This file is provided AS IS with NO WARRANTY OF ANY KIND, INCLUDING THE
  * WARRANTY OF DESIGN, MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE.
  ***************************************************************************/
 
-#ifndef __indigo_arreviations__
-#define __indigo_arreviations__
+#ifndef __molecule_gross_formula_options__
+#define __molecule_gross_formula_options__
 
-#include <string>
-#include <vector>
+#include "base_c/defs.h"
 
-#include "base_cpp/ptr_array.h"
+#ifdef _WIN32
+#pragma warning(push)
+#pragma warning(disable:4251)
+#endif
 
-namespace indigo 
-{
+namespace indigo {
 
-namespace abbreviations 
-{
-
-struct Abbreviation
-{
-   std::string name, expansion;
-   std::vector<std::string> left_aliases, right_aliases, left_aliases2, right_aliases2;
-
-   int connections;
-};
-
-class IndigoAbbreviations
+class DLLEXPORT GrossFormulaOptions
 {
 public:
-   IndigoAbbreviations ();
+   GrossFormulaOptions ();
 
-   void clear();
-	
-   PtrArray<Abbreviation> abbreviations;
+   void reset ();
 
-private:
-   void loadDefault ();
+   // Add R# to gross formula string if molecule contains RSites. Default is false.
+   bool add_rsites;
 };
 
-IndigoAbbreviations& indigoGetAbbreviationsInstance ();
+}
 
-}}
+#ifdef _WIN32
+#pragma warning(pop)
+#endif
 
-#endif // __indigo_arreviations__
+#endif // __molecule_gross_formula_options__

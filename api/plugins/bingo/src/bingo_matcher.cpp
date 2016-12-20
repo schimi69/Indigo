@@ -143,7 +143,7 @@ BaseMatcher::~BaseMatcher ()
    else if (_current_obj && IndigoReaction::is(*_current_obj))
       ((IndexCurrentReaction *)_current_obj)->matcher_exist = false;
 
-   if (!_current_obj_used)
+   if (_current_obj && !_current_obj_used)
       delete _current_obj;
 }
 
@@ -1115,4 +1115,23 @@ bool MolGrossMatcher::_tryCurrent ()/* const */
    GrossStorage &gross_storage = _index.getGrossStorage();
 
    return gross_storage.tryCandidate(_query_array, _current_id);
+}
+
+
+EnumeratorMatcher::EnumeratorMatcher (BaseIndex &index) : BaseMatcher(index, (IndigoObject *&)_indigoObject)
+{
+    _id_numbers = index.getIdMapping().size();
+    _current_id = 0;
+    _indigoObject = nullptr;
+}
+   
+bool EnumeratorMatcher::next ()
+{
+    if(_current_id < _id_numbers)
+    {
+        _current_id++;
+        return true;
+    }
+    
+    return false;
 }

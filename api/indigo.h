@@ -390,6 +390,9 @@ CEXPORT int indigoCheckValence (int atom);
 // Returns one if atom or bond belongs Query or has any query feature
 CEXPORT int indigoCheckQuery (int item);
 
+// Returns one if structure contains RGroup features (RSites, RGroups or attachment points
+CEXPORT int indigoCheckRGroups (int item);
+
 // Applicable to atoms, query atoms, and molecules. Can fail
 // (return zero) on query atoms where the number of hydrogens
 // is not definitely known. Otherwise, returns one and writes *hydro.
@@ -414,6 +417,8 @@ CEXPORT int indigoIterateSuperatoms (int molecule);
 CEXPORT int indigoIterateGenericSGroups (int molecule);
 CEXPORT int indigoIterateRepeatingUnits (int molecule);
 CEXPORT int indigoIterateMultipleGroups (int molecule);
+
+CEXPORT int indigoIterateSGroups (int molecule);
 
 CEXPORT int indigoGetSuperatom (int molecule, int index);
 CEXPORT int indigoGetDataSGroup (int molecule, int index);
@@ -456,6 +461,7 @@ CEXPORT int indigoAddSGroupAttachmentPoint (int sgroup, int aidx, int lvidx, con
 CEXPORT int indigoDeleteSGroupAttachmentPoint (int sgroup, int index);
 CEXPORT int indigoGetSGroupDisplayOption (int sgroup);
 CEXPORT int indigoSetSGroupDisplayOption (int sgroup, int option);
+CEXPORT int indigoGetSGroupSeqId (int sgroup);
 
 CEXPORT int indigoGetSGroupMultiplier (int sgroup);
 CEXPORT int indigoSetSGroupMultiplier (int sgroup, int multiplier);
@@ -470,6 +476,11 @@ CEXPORT int indigoFindSGroups (int item, const char *property, const char *value
 
 CEXPORT int indigoGetSGroupType (int item);
 CEXPORT int indigoGetSGroupIndex (int item);
+
+CEXPORT int indigoGetSGroupOriginalId (int sgroup);
+CEXPORT int indigoSetSGroupOriginalId (int sgroup, int original);
+CEXPORT int indigoGetSGroupParentId (int sgroup);
+CEXPORT int indigoSetSGroupParentId (int sgroup, int parent);
 
 CEXPORT int indigoTransformSCSRtoCTAB (int item);
 CEXPORT int indigoTransformCTABtoSCSR (int molecule, int templates);

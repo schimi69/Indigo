@@ -1,54 +1,31 @@
 /****************************************************************************
  * Copyright (C) 2009-2015 EPAM Systems
- *
+ * 
  * This file is part of Indigo toolkit.
- *
+ * 
  * This file may be distributed and/or modified under the terms of the
  * GNU General Public License version 3 as published by the Free Software
  * Foundation and appearing in the file LICENSE.GPL included in the
  * packaging of this file.
- *
+ * 
  * This file is provided AS IS with NO WARRANTY OF ANY KIND, INCLUDING THE
  * WARRANTY OF DESIGN, MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE.
  ***************************************************************************/
 
-#ifndef __indigo_arreviations__
-#define __indigo_arreviations__
+#include "molecule/molecule_gross_formula_options.h"
 
-#include <string>
-#include <vector>
+using namespace indigo;
 
-#include "base_cpp/ptr_array.h"
-
-namespace indigo 
+//
+// GrossFormulaOptions
+//
+GrossFormulaOptions::GrossFormulaOptions ()
 {
+   reset();
+}
 
-namespace abbreviations 
+void GrossFormulaOptions::reset ()
 {
+   add_rsites = false;
+}
 
-struct Abbreviation
-{
-   std::string name, expansion;
-   std::vector<std::string> left_aliases, right_aliases, left_aliases2, right_aliases2;
-
-   int connections;
-};
-
-class IndigoAbbreviations
-{
-public:
-   IndigoAbbreviations ();
-
-   void clear();
-	
-   PtrArray<Abbreviation> abbreviations;
-
-private:
-   void loadDefault ();
-};
-
-IndigoAbbreviations& indigoGetAbbreviationsInstance ();
-
-}}
-
-#endif // __indigo_arreviations__

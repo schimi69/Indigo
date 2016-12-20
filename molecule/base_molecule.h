@@ -348,7 +348,7 @@ protected:
 
    void _flipSGroupBond(SGroup &sgroup, int src_bond_idx, int new_bond_idx);
    void _flipSuperatomBond(Superatom &sa, int src_bond_idx, int new_bond_idx);
-   void _flipTemplateAtomAttachmentPoint(int idx, int atom_from, int atom_to);
+   void _flipTemplateAtomAttachmentPoint(int idx, int atom_from, Array<char> &ap_id, int atom_to);
    
    virtual void _mergeWithSubmolecule (BaseMolecule &mol, const Array<int> &vertices,
            const Array<int> *edges, const Array<int> &mapping, int skip_flags) = 0;
@@ -374,9 +374,12 @@ protected:
 
    void _checkSgroupHierarchy(int pidx, int oidx);
 
-   int _transformTGroupToSGroup (int idx);
+   int _transformTGroupToSGroup (int idx, int t_idx);
+   int _transformSGroupToTGroup (int idx, int &t_idx);
    int _addTemplate (TGroup &tgroup);
    void _fillTemplateSeqIds ();
+   bool _isCTerminus (Superatom &su, int idx);
+   bool _isNTerminus (Superatom &su, int idx);
 
    Array<int> _hl_atoms;
    Array<int> _hl_bonds;
