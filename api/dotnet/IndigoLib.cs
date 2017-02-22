@@ -11,7 +11,7 @@ namespace com.epam.indigo
         void indigoSetSessionId(long id);
         void indigoReleaseSessionId(long id);
         sbyte* indigoGetLastError();
-        void indigoSetErrorMessage(String message);
+        void indigoSetErrorMessage(string message);
         int indigoFree(int id);
         int indigoClone(int id);
         int indigoCountReferences();
@@ -102,7 +102,7 @@ namespace com.epam.indigo
         int indigoIonize(int item, float pH, float pH_toll);
         float* indigoGetAcidPkaValue(int item, int atom, int level, int min_level);
         float* indigoGetBasicPkaValue(int item, int atom, int level, int min_level);
-        int indigoBuildPkaModel(int level, float theshold, String filename);
+        int indigoBuildPkaModel(int level, float theshold, string filename);
 
         int indigoIterateAtoms(int molecule);
         int indigoIteratePseudoatoms(int molecule);
@@ -111,9 +111,12 @@ namespace com.epam.indigo
         int indigoIterateAlleneCenters(int molecule);
         int indigoIterateRGroups(int molecule);
         int indigoIterateRGroupFragments(int rgroup);
+        int indigoCountRGroups (int molecule);
         int indigoCountAttachmentPoints(int rgroup);
         int indigoIsPseudoatom(int atom);
         int indigoIsRSite(int atom);
+        int indigoIsTemplateAtom(int atom);
+
         int indigoStereocenterType(int atom);
         int* indigoStereocenterPyramid(int atom);
         int indigoSingleAllowedRGroup(int rsite);
@@ -135,6 +138,7 @@ namespace com.epam.indigo
         int indigoValence(int atom);
         int indigoCheckValence(int atom);
         int indigoCheckQuery(int item);
+        int indigoCheckRGroups (int item);
         int indigoCountHydrogens(int atom, int* hydro);
         int indigoCountImplicitHydrogens(int item);
 
@@ -150,6 +154,7 @@ namespace com.epam.indigo
         int indigoIterateRepeatingUnits(int item);
         int indigoIterateMultipleGroups(int item);
         int indigoIterateSGroups(int item);
+        int indigoIterateTGroups(int item);
 
         int indigoGetDataSGroup(int mol, int idx);
         int indigoGetSuperatom(int mol, int idx);
@@ -164,6 +169,8 @@ namespace com.epam.indigo
 
         int indigoAddSuperatom(int molecule, int natoms, int[] atoms, string name);
 
+        sbyte* indigoGetRepeatingUnitSubscript (int sgroup);
+        int indigoGetRepeatingUnitConnectivity (int sgroup);
         int indigoCreateSGroup(string type, int mapping, string name);
         int indigoSetSGroupClass(int sgroup, string sgclass);
         int indigoSetSGroupName(int sgroup, string sgname);
@@ -175,9 +182,9 @@ namespace com.epam.indigo
         int indigoGetSGroupDisplayOption(int sgroup);
         int indigoSetSGroupDisplayOption(int sgroup, int option);
         int indigoGetSGroupSeqId(int sgroup);
+        float* indigoGetSGroupCoords(int sgroup);
         int indigoGetSGroupMultiplier(int sgroup);
         int indigoSetSGroupMultiplier(int sgroup, int mult);
-
         int indigoSetSGroupData (int sgroup,  string data);
         int indigoSetSGroupCoords (int sgroup, float x, float y);
         int indigoSetSGroupDescription (int sgroup, string description);
@@ -203,8 +210,19 @@ namespace com.epam.indigo
         int indigoGetSGroupParentId(int sgroup);
         int indigoSetSGroupParentId(int sgroup, int parent);
 
+        int indigoAddTemplate(int molecule, int templates, string name);
+        int indigoRemoveTemplate(int molecule, string name);
+        int indigoFindTemplate(int molecule, string name);
+
+        sbyte* indigoGetTGroupClass(int tgroup);
+        sbyte* indigoGetTGroupName(int tgroup);
+        sbyte* indigoGetTGroupAlias(int tgroup);
+
         int indigoTransformSCSRtoCTAB(int molecule);
         int indigoTransformCTABtoSCSR(int molecule, int templates);
+
+        sbyte* indigoGetTemplateAtomClass(int atom);
+        int indigoSetTemplateAtomClass(int atom, string name);
 
         float* indigoXYZ(int atom);
         int indigoSetXYZ(int atom, float x, float y, float z);
@@ -280,6 +298,7 @@ namespace com.epam.indigo
         double indigoMolecularWeight(int molecule);
         double indigoMostAbundantMass(int molecule);
         double indigoMonoisotopicMass(int molecule);
+        sbyte* indigoMassComposition (int molecule);
         sbyte* indigoCanonicalSmiles(int molecule);
         sbyte* indigoLayeredCode(int molecule);
         int indigoHasCoord(int molecule);
@@ -300,6 +319,7 @@ namespace com.epam.indigo
         int indigoFoldHydrogens(int item);
         int indigoUnfoldHydrogens(int item);
         int indigoLayout(int item);
+        int indigoClean2d (int item);
         sbyte* indigoSmiles(int item);
         sbyte* indigoSmarts(int item);
         sbyte* indigoCanonicalSmarts(int item);
@@ -366,8 +386,9 @@ namespace com.epam.indigo
         int indigoMapMolecule(int match, int query_reaction_molecule);
 
         int indigoExtractCommonScaffold(int structures, string options);
+        int indigoRGroupComposition(int molecule, string options);
+        int indigoGetFragmentedMolecule (int molecule, string options);
         int indigoAllScaffolds(int extracted);
-
         int indigoDecomposeMolecules(int scaffold, int structures);
         int indigoDecomposedMoleculeScaffold(int decomp);
         int indigoIterateDecomposedMolecules(int decomp);

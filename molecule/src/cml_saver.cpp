@@ -44,7 +44,6 @@ void CmlSaver::saveQueryMolecule (QueryMolecule &mol)
 void CmlSaver::_saveMolecule (BaseMolecule &mol, bool query)
 {
    LocaleGuard locale_guard;
-   int i;
    AutoPtr<TiXmlDocument> doc(new TiXmlDocument());
    _doc = doc->GetDocument();
    _root = 0;
@@ -66,7 +65,7 @@ void CmlSaver::_saveMolecule (BaseMolecule &mol, bool query)
    TiXmlPrinter printer;
    _doc->Accept(&printer);
    _output.printf("%s", printer.CStr());
-   doc.release();
+   doc.reset(nullptr);
 }
 
 void CmlSaver::_addMoleculeElement (TiXmlElement *elem, BaseMolecule &mol, bool query)
@@ -105,7 +104,7 @@ void CmlSaver::_addMoleculeElement (TiXmlElement *elem, BaseMolecule &mol, bool 
 
          int atom_number = _mol->getAtomNumber(i);
 
-         const char *atom_str;
+         const char *atom_str = nullptr;
 
          if (_mol->isRSite(i))
             atom_str = "R";
@@ -128,6 +127,9 @@ void CmlSaver::_addMoleculeElement (TiXmlElement *elem, BaseMolecule &mol, bool 
             }
          }
 
+         if(atom_str == nullptr) {
+            throw Error("internal error: atom element was not set");
+         }
          TiXmlElement * atom = new TiXmlElement("atom");
          atomarray->LinkEndChild(atom);
 

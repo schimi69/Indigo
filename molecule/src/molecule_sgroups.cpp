@@ -142,7 +142,6 @@ void MoleculeSGroups::clear ()
 
 void MoleculeSGroups::clear (int sg_type)
 {
-   int count = 0;
    for (int i = _sgroups.begin(); i != _sgroups.end(); i = _sgroups.next(i))
    {
      if (_sgroups.at(i)->sgroup_type == sg_type)
@@ -273,7 +272,7 @@ bool MoleculeSGroups::getParentAtoms(int idx, Array<int> &target)
 
 bool MoleculeSGroups::getParentAtoms(SGroup &sgroup, Array<int> &target)
 {
-   if (sgroup.parent_idx < 0) {
+   if (sgroup.parent_idx <= 0) {
       return false;
    }
 

@@ -1,5 +1,5 @@
 /****************************************************************************
-* Copyright (C) 2009-2015 EPAM Systems
+* Copyright (C) 2009-2017 EPAM Systems
 *
 * This file is part of Indigo toolkit.
 *
@@ -211,15 +211,15 @@ void RenderContext::createSurface(cairo_write_func_t writer, Output* output, int
       throw Error("mode not set");
    case MODE_PDF:
       _surface = cairo_pdf_surface_create_for_stream(writer, opt.output, _width, _height);
-      cairoCheckStatus();
+      cairoCheckSurfaceStatus();
       break;
    case MODE_SVG:
       _surface = cairo_svg_surface_create_for_stream(writer, opt.output, _width, _height);
-      cairoCheckStatus();
+      cairoCheckSurfaceStatus();
       break;
    case MODE_PNG:
       _surface = cairo_image_surface_create (CAIRO_FORMAT_ARGB32, _width, _height);
-      cairoCheckStatus();
+      cairoCheckSurfaceStatus();
       break;
    case MODE_HDC:
 #ifdef _WIN32
@@ -248,6 +248,14 @@ void RenderContext::createSurface(cairo_write_func_t writer, Output* output, int
    default:
       throw Error("unknown mode: %d", mode);
    }
+}
+
+void RenderContext::cairoCheckSurfaceStatus () const
+{
+   cairo_status_t s;
+   s = cairo_surface_status(_surface);
+   if (s != CAIRO_STATUS_SUCCESS) 
+      throw Error("Cairo error: %s\n", cairo_status_to_string(s));
 }
 
 void RenderContext::init()
@@ -404,17 +412,32 @@ void RenderContext::drawItemBackground (const RenderItem& item)
 {
    cairo_rectangle(_cr, item.bbp.x, item.bbp.y, item.bbsz.x, item.bbsz.y);
    cairoCheckStatus();
-   if (opt.backgroundColor.x >= 0 && opt.backgroundColor.y >= 0 && opt.backgroundColor.z >= 0)
+   if (opt.backgroundColor.x >= 0 && opt.backgroundColor.y >= 0 && opt.backgroundColor.z >= 0) {
       setSingleSource(opt.backgroundColor);
-   else
-      setSingleSource(CWC_WHITE);
-
-   checkPathNonEmpty();
-   cairo_fill(_cr);
-   cairoCheckStatus();
+      checkPathNonEmpty();
+      cairo_fill(_cr);
+      cairoCheckStatus();
+   } else {
+      /*
+       * By default, we use transparent background
+       * Fill the rectangle with the transparent color, invalidating it and 
+       * erasing everything underneath
+       */
+      cairo_save(_cr);
+      cairoCheckStatus();
+      cairo_set_source_rgba(_cr, 0, 0, 0, 0);
+      cairoCheckStatus();
+      cairo_set_operator(_cr, CAIRO_OPERATOR_SOURCE);
+      cairoCheckStatus();
+      cairo_fill(_cr);
+      cairoCheckStatus();
+      cairo_restore(_cr);
+      cairoCheckStatus();
+      return;
+   }
 }
 
-void RenderContext::drawTextItemText (const TextItem& ti)
+void RenderContext::drawTextItemText (const TextItem& ti, bool idle)
 {
    Vec3f color;
    if (ti.ritype == RenderItem::RIT_AAM)
@@ -431,19 +454,24 @@ void RenderContext::drawTextItemText (const TextItem& ti)
       if (ti.highlighted && opt.highlightColorEnable)
          color.copy(opt.highlightColor);
    }
-   drawTextItemText (ti, color);
+   drawTextItemText (ti, color, idle);
 }
 
-void RenderContext::drawTextItemText (const TextItem& ti, const Vec3f& color)
+void RenderContext::drawTextItemText (const TextItem& ti,
+                                      const Vec3f& color,
+                                      bool idle)
 {
    bool bold = ti.highlighted && opt.highlightThicknessEnable;
-   drawTextItemText (ti, color, bold);
+   drawTextItemText (ti, color, bold, idle);
 }
 
-void RenderContext::drawTextItemText (const TextItem& ti, const Vec3f& color, bool bold)
+void RenderContext::drawTextItemText (const TextItem& ti,
+                                      const Vec3f& color,
+                                      bool bold,
+                                      bool idle)
 {
    fontsSetFont(_cr, ti.fontsize, bold);
-   fontsDrawText(ti, color, bold);
+   fontsDrawText(ti, color, bold, idle);
 }
 
 void RenderContext::drawLine (const Vec2f& v0, const Vec2f& v1)
@@ -664,7 +692,7 @@ void RenderContext::setGraphItemSizeSign (GraphItem& gi, GraphItem::TYPE type)
    gi.relpos.set(0, 0);
 }
 
-void RenderContext::drawAttachmentPoint (RenderItemAttachmentPoint& ri)
+void RenderContext::drawAttachmentPoint (RenderItemAttachmentPoint& ri, bool idle)
 {
    setSingleSource(ri.color);
    if (ri.highlighted && opt.highlightColorEnable)
@@ -711,7 +739,7 @@ void RenderContext::drawAttachmentPoint (RenderItemAttachmentPoint& ri)
       float sz = ti.bbsz.length();
       ti.bbp.addScaled(n, -(sz/2 + _settings.unit));
       ti.bbp.addScaled(ri.dir, -(sz/2 + waveWidth + _settings.unit));
-      drawTextItemText(ti);
+      drawTextItemText(ti, idle);
    }
 }
 

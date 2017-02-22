@@ -1,5 +1,5 @@
 /****************************************************************************
- * Copyright (C) 2009-2015 EPAM Systems
+ * Copyright (C) 2009-2017 EPAM Systems
  * 
  * This file is part of Indigo toolkit.
  * 
@@ -21,6 +21,7 @@
 #endif
 
 #include <utility>
+#include <memory>
 
 #include "indigo.h"
 
@@ -35,7 +36,7 @@
 #include "molecule/molecule_standardize_options.h"
 #include "molecule/molecule_ionize.h"
 #include "molecule/molecule_mass_options.h"
-#include "molecule/molecule_gross_formula_options.h"
+#include "molecule/molecule_gross_formula.h"
 
 
 /* When Indigo internal code is used dynamically the INDIGO_VERSION define 
@@ -68,7 +69,7 @@ public:
    explicit IndigoObject (int type_);
    virtual ~IndigoObject ();
 
-   enum
+   enum : int
    {
       SCANNER = 1,
       MOLECULE,
@@ -155,10 +156,12 @@ public:
       TAUTOMER_MOLECULE,
       TGROUP,
       TGROUPS_ITER,
-      GROSS_REACTION
+      GROSS_REACTION,
+      INDIGO_OBJECT_LAST_TYPE         // must be the last element in the enum
    };
 
    int type;
+   virtual const char* getTypeName() const;
 
    virtual const char * debugInfo ();
 
@@ -204,8 +207,8 @@ public:
    virtual ~IndigoMoleculeGross ();
 
    virtual void toString (Array<char> &str);
-
-    std::pair<ObjArray<Array<char> >, ObjArray<Array<int> > > gross;
+   
+   std::unique_ptr<GROSS_UNITS> gross;
 };
 
 class IndigoReactionGross : public IndigoObject
@@ -215,8 +218,8 @@ public:
    virtual ~IndigoReactionGross ();
 
    virtual void toString (Array<char> &str);
-
-   std::pair<ObjArray<std::pair<ObjArray<Array<char> >, ObjArray<Array<int> > > > , ObjArray<std::pair<ObjArray<Array<char> >, ObjArray<Array<int> > > > > gross;
+   
+   std::unique_ptr<std::pair<PtrArray<GROSS_UNITS> , PtrArray<GROSS_UNITS> > > gross;
 };
 
 

@@ -56,8 +56,9 @@ bool IndigoBaseMolecule::is (IndigoObject &object)
 
    if (type == MOLECULE || type == QUERY_MOLECULE ||
        type == REACTION_MOLECULE || type == SCAFFOLD ||
-       type == RGROUP_FRAGMENT || type == RDF_MOLECULE || type == SMILES_MOLECULE || type == CML_MOLECULE ||
-       type == CDX_MOLECULE)
+       type == RGROUP_FRAGMENT || type == RDF_MOLECULE || 
+       type == SMILES_MOLECULE || type == CML_MOLECULE ||
+       type == CDX_MOLECULE || type == SUBMOLECULE)
       return true;
 
    if (type == ARRAY_ELEMENT)
@@ -916,6 +917,19 @@ CEXPORT int indigoIsRSite (int atom)
       IndigoAtom &ia = IndigoAtom::cast(self.getObject(atom));
 
       if (ia.mol.isRSite(ia.idx))
+         return 1;
+      return 0;
+   }
+   INDIGO_END(-1);
+}
+
+CEXPORT int indigoIsTemplateAtom (int atom)
+{
+   INDIGO_BEGIN
+   {
+      IndigoAtom &ia = IndigoAtom::cast(self.getObject(atom));
+
+      if (ia.mol.isTemplateAtom(ia.idx))
          return 1;
       return 0;
    }
@@ -3212,6 +3226,21 @@ CEXPORT int indigoGetSGroupSeqId (int sgroup)
    INDIGO_END(0)
 }
 
+CEXPORT float * indigoGetSGroupCoords (int sgroup) {
+   INDIGO_BEGIN
+   {
+      IndigoDataSGroup &ds = IndigoDataSGroup::cast(self.getObject(sgroup));
+
+      auto &tmp = self.getThreadTmpData();
+      auto& xy = ds.get().display_pos;
+      tmp.xyz[0] = xy.x;
+      tmp.xyz[1] = xy.y;
+      tmp.xyz[2] = 0.f;
+      return tmp.xyz;
+   }
+   INDIGO_END(0)
+}
+
 CEXPORT int indigoGetSGroupMultiplier (int sgroup)
 {
    INDIGO_BEGIN
@@ -3390,6 +3419,92 @@ CEXPORT int indigoSetSGroupParentId (int sgroup, int parent)
       return 1;
    }
    INDIGO_END(-1)
+}
+
+CEXPORT int indigoAddTemplate (int molecule, int templates, const char *tname)
+{
+   INDIGO_BEGIN
+   {
+      BaseMolecule &mol = self.getObject(molecule).getBaseMolecule();
+      BaseMolecule &temp = self.getObject(templates).getBaseMolecule();
+      int tgidx = temp.tgroups.findTGroup(tname);
+      if (tgidx != -1) 
+      {
+         TGroup &tg = temp.tgroups.getTGroup(tgidx);
+         int idx = mol.addTemplate(tg);
+         return idx + 1;
+      }
+      return 0;
+   }
+   INDIGO_END(-1)
+}
+
+CEXPORT int indigoRemoveTemplate (int molecule, const char *tname)
+{
+   INDIGO_BEGIN
+   {
+      BaseMolecule &mol = self.getObject(molecule).getBaseMolecule();
+      int tgidx = mol.tgroups.findTGroup(tname);
+      if (tgidx != -1) 
+      {
+         mol.tgroups.remove(tgidx);
+      }
+      return 1;
+   }
+   INDIGO_END(-1)
+}
+
+CEXPORT int indigoFindTemplate (int molecule, const char *tname)
+{
+   INDIGO_BEGIN
+   {
+      BaseMolecule &mol = self.getObject(molecule).getBaseMolecule();
+      int tgidx = mol.tgroups.findTGroup(tname);
+      if (tgidx != -1) 
+      {
+         return tgidx + 1;
+      }
+      return 0;
+   }
+   INDIGO_END(-1)
+}
+
+CEXPORT const char * indigoGetTGroupClass (int tgroup)
+{
+   INDIGO_BEGIN
+   {
+      TGroup &tg = IndigoTGroup::cast(self.getObject(tgroup)).get();
+      if (tg.tgroup_class.size() < 1)
+         return "";
+      return tg.tgroup_class.ptr();
+   }
+   INDIGO_END(0)
+}
+
+CEXPORT const char * indigoGetTGroupName (int tgroup)
+{
+   INDIGO_BEGIN
+   {
+      TGroup &tg = IndigoTGroup::cast(self.getObject(tgroup)).get();
+      if (tg.tgroup_name.size() < 1)
+         return "";
+      return tg.tgroup_name.ptr();
+      
+   }
+   INDIGO_END(0)
+}
+
+CEXPORT const char * indigoGetTGroupAlias (int tgroup)
+{
+   INDIGO_BEGIN
+   {
+      TGroup &tg = IndigoTGroup::cast(self.getObject(tgroup)).get();
+      if (tg.tgroup_alias.size() < 1)
+         return "";
+      return tg.tgroup_alias.ptr();
+      
+   }
+   INDIGO_END(0)
 }
 
 CEXPORT int indigoTransformSCSRtoCTAB (int molecule)
@@ -3739,10 +3854,14 @@ CEXPORT int indigoResetAtom (int atom, const char *symbol)
 
          if (elem > 0)
             mol.resetAtom(ia.idx, elem);
-         else
+         else if (!mol.isTemplateAtom(ia.idx))
          {
             mol.resetAtom(ia.idx, ELEM_PSEUDO);
             mol.setPseudoAtom(ia.idx, symbol);
+         }
+         else
+         {
+            mol.setTemplateAtomName(ia.idx, symbol);
          }
       }
       bmol.invalidateAtom(ia.idx, BaseMolecule::CHANGED_ATOM_NUMBER);
@@ -3751,6 +3870,49 @@ CEXPORT int indigoResetAtom (int atom, const char *symbol)
    }
    INDIGO_END(-1)
 }
+
+CEXPORT const char * indigoGetTemplateAtomClass (int atom)
+{
+   INDIGO_BEGIN
+   {
+      IndigoAtom &ia = IndigoAtom::cast(self.getObject(atom));
+
+      BaseMolecule &bmol = ia.mol;
+      Molecule &mol = ia.mol.asMolecule();
+
+      if (mol.isTemplateAtom(ia.idx))
+      {
+         return ia.mol.getTemplateAtomClass(ia.idx);
+      }
+      else
+         throw IndigoError("indigoGetTemplateAtomClass(): atom %d is not template atom", ia.idx);
+ 
+      return "";
+   }
+   INDIGO_END(0)
+}
+
+CEXPORT int indigoSetTemplateAtomClass (int atom, const char *name)
+{
+   INDIGO_BEGIN
+   {
+      IndigoAtom &ia = IndigoAtom::cast(self.getObject(atom));
+
+      BaseMolecule &bmol = ia.mol;
+      Molecule &mol = ia.mol.asMolecule();
+
+      if (mol.isTemplateAtom(ia.idx))
+      {
+         mol.setTemplateAtomClass(ia.idx, name);
+      }
+      else
+         throw IndigoError("indigoSetTemplateAtomClass(): atom %d is not template atom", ia.idx);
+ 
+      return 1;
+   }
+   INDIGO_END(-1)
+}
+
 
 static void _parseRSites (const char *name, Array<int> &rsites)
 {
@@ -3896,7 +4058,7 @@ CEXPORT int indigoSetBondOrder (int bond, int order)
 
 IndigoSubmolecule::IndigoSubmolecule (BaseMolecule &mol_, Array<int> &vertices_, Array<int> &edges_) :
 IndigoObject(SUBMOLECULE),
-mol(mol_)
+_mol(mol_)
 {
    vertices.copy(vertices_);
    edges.copy(edges_);
@@ -3905,7 +4067,7 @@ mol(mol_)
 
 IndigoSubmolecule::IndigoSubmolecule (BaseMolecule &mol_, List<int> &vertices_, List<int> &edges_) :
 IndigoObject(SUBMOLECULE),
-mol(mol_)
+_mol(mol_)
 {
    int i;
    
@@ -3925,9 +4087,23 @@ IndigoSubmolecule::~IndigoSubmolecule ()
 {
 }
 
+void IndigoSubmolecule::_createSubMolecule() {
+   if(_submol.get() != 0 && _submol_revision == _mol.getEditRevision()) {
+      return;
+   }
+   if (_mol.isQueryMolecule()) {
+      _submol.reset(new QueryMolecule());
+   } else {
+      _submol.reset(new Molecule());
+   }
+   _submol->makeEdgeSubmolecule(_mol, vertices, edges, 0, 0);
+   _submol_revision = _mol.getEditRevision();
+}
+
 BaseMolecule & IndigoSubmolecule::getBaseMolecule ()
 {
-   return mol;
+   _createSubMolecule();
+   return _submol.ref();
 }
 
 int IndigoSubmolecule::getIndex ()
@@ -3943,7 +4119,7 @@ IndigoObject * IndigoSubmolecule::clone ()
    AutoPtr<IndigoObject> res;
    BaseMolecule *newmol;
 
-   if (mol.isQueryMolecule())
+   if (_mol.isQueryMolecule())
    {
       res.reset(new IndigoQueryMolecule());
       newmol = &(((IndigoQueryMolecule *)res.get())->qmol);
@@ -3954,7 +4130,7 @@ IndigoObject * IndigoSubmolecule::clone ()
       newmol = &(((IndigoMolecule *)res.get())->mol);
    }
 
-   newmol->makeEdgeSubmolecule(mol, vertices, edges, 0, 0);
+   newmol->makeEdgeSubmolecule(_mol, vertices, edges, 0, 0);
    return res.release();
 }
 
@@ -3981,7 +4157,7 @@ IndigoObject * IndigoSubmoleculeAtomsIter::next ()
 
    _idx++;
 
-   return new IndigoAtom(_submol.mol, _submol.vertices[_idx]);
+   return new IndigoAtom(_submol.getOriginalMolecule(), _submol.vertices[_idx]);
 }
 
 IndigoSubmoleculeBondsIter::IndigoSubmoleculeBondsIter (IndigoSubmolecule &submol) :
@@ -4007,7 +4183,7 @@ IndigoObject * IndigoSubmoleculeBondsIter::next ()
 
    _idx++;
 
-   return new IndigoBond(_submol.mol, _submol.edges[_idx]);
+   return new IndigoBond(_submol.getOriginalMolecule(), _submol.edges[_idx]);
 }
 
 CEXPORT int indigoCountSSSR (int molecule)

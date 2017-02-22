@@ -41,7 +41,7 @@ public:
    bool isEOF ();
    void readNext ();
    void readAt (int index);
-   int tell ();
+   long long tell ();
    int currentNumber ();
    int count ();
 
@@ -77,9 +77,9 @@ protected:
    Scanner *_scanner;
    bool _isMolecule;
 
-   TL_CP_DECL(Array<int>, _offsets);
+   TL_CP_DECL(Array<long long>, _offsets);
    int _current_number;
-   int _max_offset;
+   long long _max_offset;
 };
 
 }

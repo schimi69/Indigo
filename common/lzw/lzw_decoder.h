@@ -60,9 +60,9 @@ public:
    virtual void skip (int n);
    virtual bool isEOF ();
    virtual int  lookNext ();
-   virtual void seek (int pos, int from);
-   virtual int  length ();
-   virtual int  tell ();
+   virtual void seek (long long pos, int from);
+   virtual long long length ();
+   virtual long long tell ();
 
    virtual byte readByte ();
 

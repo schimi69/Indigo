@@ -17,7 +17,7 @@ IndigoMoleculeGross::~IndigoMoleculeGross()
 void IndigoMoleculeGross::toString (Array<char> &str)
 {
    Indigo &self = indigoGetInstance();
-   MoleculeGrossFormula::toString_Hill(gross, str, self.gross_formula_options.add_rsites);
+   MoleculeGrossFormula::toString_Hill(*gross, str, self.gross_formula_options.add_rsites);
 }
 
 IndigoReactionGross::IndigoReactionGross() : IndigoObject(GROSS_REACTION)
@@ -31,7 +31,7 @@ IndigoReactionGross::~IndigoReactionGross()
 void IndigoReactionGross::toString (Array<char> &str)
 {
     Indigo &self = indigoGetInstance();
-    ReactionGrossFormula::toString_Hill(gross, str, self.gross_formula_options.add_rsites);
+    ReactionGrossFormula::toString_Hill(*gross, str, self.gross_formula_options.add_rsites);
 }
 
 
@@ -45,7 +45,7 @@ CEXPORT int indigoGrossFormula (int object)
           BaseMolecule &mol = self.getObject(object).getBaseMolecule();
           AutoPtr<IndigoMoleculeGross> grossptr(new IndigoMoleculeGross());
 
-          MoleculeGrossFormula::collect(mol, grossptr->gross);
+          grossptr->gross = MoleculeGrossFormula::collect(mol);
           return self.addObject(grossptr.release());
       }
       else if (IndigoBaseReaction::is(indigoObject))
@@ -53,25 +53,37 @@ CEXPORT int indigoGrossFormula (int object)
           BaseReaction &rxn = self.getObject(object).getBaseReaction();
           AutoPtr<IndigoReactionGross> grossptr(new IndigoReactionGross());
           
-          ReactionGrossFormula::collect(rxn, grossptr->gross);
-          return self.addObject(grossptr.release());
+         grossptr->gross = ReactionGrossFormula::collect(rxn);
+         return self.addObject(grossptr.release());
       }
       else
       {
-          throw IndigoError("incorrect object type for gross formula: %s", indigoObject.type);
+         throw IndigoError("incorrect object type for gross formula: %s", indigoObject.debugInfo());
       }
    }
    INDIGO_END(-1)
+}
+
+static BaseMolecule& _indigoPrepareMass(IndigoObject & obj, MoleculeMass mass) {
+   if (IndigoBaseMolecule::is(obj)) {
+      auto &mol = obj.getBaseMolecule();
+      if(mol.isQueryMolecule()) {
+         throw IndigoError("can not calculate mass for query molecule");
+      }
+      return mol;
+   } else {
+      throw IndigoError("incorrect object type for mass: %s", obj.debugInfo());
+   }
 }
 
 CEXPORT double indigoMolecularWeight (int molecule)
 {
    INDIGO_BEGIN
    {
-      Molecule &mol = self.getObject(molecule).getMolecule();
       MoleculeMass mass;
+      auto& mol = _indigoPrepareMass(self.getObject(molecule), mass);
       mass.mass_options = self.mass_options;
-      return mass.molecularWeight(mol);
+      return mass.molecularWeight(mol.asMolecule());
    }
    INDIGO_END(-1)
 }
@@ -80,11 +92,10 @@ CEXPORT double indigoMostAbundantMass (int molecule)
 {
    INDIGO_BEGIN
    {
-      Molecule &mol = self.getObject(molecule).getMolecule();
-
       MoleculeMass mass;
+      auto& mol = _indigoPrepareMass(self.getObject(molecule), mass);
       mass.mass_options = self.mass_options;
-      return mass.mostAbundantMass(mol);
+      return mass.mostAbundantMass(mol.asMolecule());
    }
    INDIGO_END(-1)
 }
@@ -93,25 +104,26 @@ CEXPORT double indigoMonoisotopicMass (int molecule)
 {
    INDIGO_BEGIN
    {
-      Molecule &mol = self.getObject(molecule).getMolecule();
-
       MoleculeMass mass;
+      auto& mol = _indigoPrepareMass(self.getObject(molecule), mass);
       mass.mass_options = self.mass_options;
-      return mass.monoisotopicMass(mol);
+      return mass.monoisotopicMass(mol.asMolecule());
    }
    INDIGO_END(-1)
 }
 
 CEXPORT const char * indigoMassComposition (int molecule)
 {
-    INDIGO_BEGIN
-    {
-        Molecule &mol = self.getObject(molecule).getMolecule();
-        auto &tmp = self.getThreadTmpData();
-        MoleculeMass mass;
-        mass.mass_options = self.mass_options;
-        mass.massComposition(mol, tmp.string);
-        return tmp.string.ptr();
-    }
-    INDIGO_END(0)
+   INDIGO_BEGIN
+   {
+      MoleculeMass mass;
+      auto& mol = _indigoPrepareMass(self.getObject(molecule), mass);
+      mass.mass_options = self.mass_options;
+      
+      auto &tmp = self.getThreadTmpData();
+      mass.massComposition(mol.asMolecule(), tmp.string);
+        
+      return tmp.string.ptr();
+   }
+   INDIGO_END(0)
 }

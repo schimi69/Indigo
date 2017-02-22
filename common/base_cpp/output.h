@@ -32,8 +32,8 @@ public:
    virtual ~Output ();
 
    virtual void write (const void *data, int size) = 0;
-   virtual void seek  (int offset, int from) = 0;
-   virtual int  tell  () = 0;
+   virtual void seek  (long long offset, int from) = 0;
+   virtual long long tell  () = 0;
    virtual void flush () = 0;
 
    virtual void writeByte (byte value);
@@ -67,8 +67,8 @@ public:
    virtual ~FileOutput ();
 
    virtual void write (const void *data, int size);
-   virtual void seek  (int offset, int from);
-   virtual int  tell  ();
+   virtual void seek  (long long offset, int from);
+   virtual long long tell  ();
    virtual void flush ();
    
 protected:
@@ -82,8 +82,8 @@ public:
    virtual ~ArrayOutput ();
 
    virtual void write (const void *data, int size);
-   virtual void seek  (int offset, int from);
-   virtual int  tell  ();
+   virtual void seek  (long long offset, int from);
+   virtual long long tell  ();
    virtual void flush ();
 
    void clear ();
@@ -99,8 +99,8 @@ public:
    virtual ~StandardOutput ();
 
    virtual void write (const void *data, int size);
-   virtual void seek  (int offset, int from);
-   virtual int  tell  ();
+   virtual void seek  (long long offset, int from);
+   virtual long long tell  ();
    virtual void flush ();
 protected:
    int _count;
@@ -113,8 +113,8 @@ public:
    virtual ~NullOutput ();
 
    virtual void write (const void *data, int size);
-   virtual void seek  (int offset, int from);
-   virtual int  tell  ();
+   virtual void seek  (long long offset, int from);
+   virtual long long tell  ();
    virtual void flush ();
 };
 

@@ -35,7 +35,7 @@ TL_CP_GET(_preread)
 
    // detect if input is gzipped
    byte id[2];
-   int pos = scanner.tell();
+   long long pos = scanner.tell();
 
    scanner.readCharsFix(2, (char *)id);
    scanner.seek(pos, SEEK_SET);
@@ -51,7 +51,7 @@ TL_CP_GET(_preread)
       _own_scanner = false;
    }
    _current_number = 0;
-   _max_offset = 0;
+   _max_offset = 0LL;
    _offsets.clear();
    _preread.clear();
 }
@@ -62,7 +62,7 @@ SdfLoader::~SdfLoader()
       delete _scanner;
 }
 
-int SdfLoader::tell ()
+long long SdfLoader::tell ()
 {
    return _scanner->tell();
 }
@@ -74,7 +74,7 @@ int SdfLoader::currentNumber ()
 
 int SdfLoader::count ()
 {
-   int offset = _scanner->tell();
+   long long offset = _scanner->tell();
    int cn = _current_number;
 
    if (offset != _max_offset)
@@ -132,7 +132,7 @@ void SdfLoader::readNext ()
 
    bool pending_emptyline = false;
 
-   int last_offset = -1;
+   long long last_offset = -1LL;
    while (!_scanner->isEOF())
    {
       last_offset = _scanner->tell();
@@ -155,8 +155,6 @@ void SdfLoader::readNext ()
          throw Error("data size exceeded the acceptable size %d bytes, Please check for correct file format", MAX_DATA_SIZE);
    }
    
-   int properties_offset = last_offset;
-
    while (1)
    {
       if (strncmp(str.ptr(), "$$$$", 4) == 0)
@@ -239,6 +237,10 @@ void SdfLoader::readAt (int index)
    else
    {
       _scanner->seek(_max_offset, SEEK_SET);
+      if (_scanner->isEOF()) {
+         throw Error("No such record index: %d", index);
+      }
+
       _preread.clear();
       _current_number = _offsets.size();
       do

@@ -2254,7 +2254,7 @@ void MolfileLoader::_readCtab3000 ()
    
             if (label == -1)
             {
-               int cur_pos = strscan.tell();
+               long long cur_pos = strscan.tell();
                QS_DEF(ReusableObjArray< Array<char> >, strs);
                strs.clear();
                strs.push().readString("CLASS", false);
@@ -2327,7 +2327,7 @@ void MolfileLoader::_readCtab3000 ()
                _qmol->addAtom(new QueryMolecule::Atom(QueryMolecule::ATOM_RSITE, 0));
          }
    
-         int hcount = 0;
+//         int hcount = 0;
          int irflag = 0;
          int ecflag = 0;
          int radical = 0;
@@ -2983,7 +2983,7 @@ void MolfileLoader::_readRGroups3000 ()
 
    while (!_scanner.isEOF())
    {
-      int next_block_pos = _scanner.tell();
+      long long next_block_pos = _scanner.tell();
 
       _scanner.readLine(str, true);
 
@@ -3019,7 +3019,7 @@ void MolfileLoader::_readRGroups3000 ()
 
          while (!_scanner.isEOF())
          {
-            int pos = _scanner.tell();
+            long long pos = _scanner.tell();
 
             _scanner.readLine(str, true);
             if (strcmp(str.ptr(), "M  V30 BEGIN CTAB") == 0)
@@ -3443,8 +3443,10 @@ void MolfileLoader::_readTGroups3000 ()
                   stop_char = strscan.readChar();
                   if (stop_char == '/' && !strscan.isEOF())
                   {
-                     strscan.readWord(word, 0);
+                     strscan.readWord(word, " /");
                      tgroup.tgroup_alias.copy(word);
+                     if (!strscan.isEOF())  // Skip stop char
+                        strscan.skip(1);
                   }
                }
             }
@@ -3455,7 +3457,10 @@ void MolfileLoader::_readTGroups3000 ()
 
             while (!strscan.isEOF())
             {
+               strscan.skipSpace();
                strscan.readWord(word, "=");
+               strscan.skip(1); // =
+               word.push(0);
                if (strcmp(word.ptr(), "COMMENT") == 0)
                {
                   _readStringInQuotes(strscan, &tgroup.tgroup_comment);
@@ -3471,7 +3476,7 @@ void MolfileLoader::_readTGroups3000 ()
             }
              
 
-            int pos = _scanner.tell();
+            long long pos = _scanner.tell();
             _scanner.readLine(str, true);
             if (strcmp(str.ptr(), "M  V30 BEGIN CTAB") == 0)
             {
@@ -3522,9 +3527,9 @@ void MolfileLoader::_readSGroupDisplay (Scanner &scanner, DataSGroup &dsg)
    if (scanner.readChar() == 'U')
       dsg.display_units = true;
 
-   int cur = scanner.tell();
-   scanner.seek(0, SEEK_END);
-   int end = scanner.tell();
+   long long cur = scanner.tell();
+   scanner.seek(0LL, SEEK_END);
+   long long end = scanner.tell();
    scanner.seek(cur, SEEK_SET);
 
    scanner.skip(3);

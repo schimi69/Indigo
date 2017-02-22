@@ -248,6 +248,14 @@ bool MoleculeCisTrans::isGeomStereoBond (BaseMolecule &mol, int bond_idx,
        end.degree() < 2 || end.degree() > 3)
       return false;
 
+   // If double bond is inside single cycle with size 7 or smaller it can be just cis
+   // it requires additional check
+/*
+   if ( (mol.getEdgeTopology(bond_idx) == TOPOLOGY_RING) && (mol.edgeSmallestRingSize(bond_idx) <= 7) &&
+        (mol.vertexSmallestRingSize(beg_idx) <= 7) && (mol.vertexSmallestRingSize(end_idx) <= 7) )
+      return false;
+*/       
+
    substituents[0] = -1;
    substituents[1] = -1;
    substituents[2] = -1;
@@ -418,9 +426,8 @@ void MoleculeCisTrans::build (int *exclude_bonds)
 
       int *substituents = _bonds[i].substituents;
 
-
       // Ignore only bonds that can be cis-trans ?
-      // Ignore bonds marked bonds
+      // Ignore bonds marked as ignored
       if (exclude_bonds != 0 && exclude_bonds[i])
       {
          _bonds[i].ignored = 1;
@@ -434,7 +441,6 @@ void MoleculeCisTrans::build (int *exclude_bonds)
          have_xyz = false;
       if (!isGeomStereoBond(mol, i, substituents, have_xyz))
          continue;
-
 
       if (!sortSubstituents(mol, substituents, 0))
          continue;
@@ -652,8 +658,6 @@ int MoleculeCisTrans::_getPairParity (int v1, int v2, const int *mapping, bool s
 
 int MoleculeCisTrans::applyMapping (int parity, const int *substituents, const int *mapping, bool sort)
 {
-   int sum = 0;
-
    int p1 = _getPairParity(substituents[0], substituents[1], mapping, sort);
    int p2 = _getPairParity(substituents[2], substituents[3], mapping, sort);
    if (p1 == 0 || p2 == 0)
@@ -673,11 +677,13 @@ int MoleculeCisTrans::getMappingParitySign (BaseMolecule &query, BaseMolecule &t
    int target_edge_idx = Graph::findMappedEdge(query, target, bond_idx, mapping);
    int target_parity = target.cis_trans.getParity(target_edge_idx);
 
-   if (target_parity == 0)
-      if (query_parity != 0)
+   if (target_parity == 0) {
+      if (query_parity != 0) {
          return -2; // Mapping is not valid
-      else
+      } else {
          return 0;
+      }
+   }
 
    const int *query_subst = query.cis_trans.getSubstituents(bond_idx);
    int query_subst_mapped[4];

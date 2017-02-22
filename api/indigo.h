@@ -342,6 +342,7 @@ CEXPORT int indigoCountRGroups(int molecule);
 
 CEXPORT int indigoIsPseudoatom (int atom);
 CEXPORT int indigoIsRSite (int atom);
+CEXPORT int indigoIsTemplateAtom (int atom);
 
 // returns INDIGO_{ABS,OR,AND,EITHER}
 // or zero if the atom is not a stereoatom
@@ -462,6 +463,7 @@ CEXPORT int indigoDeleteSGroupAttachmentPoint (int sgroup, int index);
 CEXPORT int indigoGetSGroupDisplayOption (int sgroup);
 CEXPORT int indigoSetSGroupDisplayOption (int sgroup, int option);
 CEXPORT int indigoGetSGroupSeqId (int sgroup);
+CEXPORT float * indigoGetSGroupCoords (int sgroup);
 
 CEXPORT int indigoGetSGroupMultiplier (int sgroup);
 CEXPORT int indigoSetSGroupMultiplier (int sgroup, int multiplier);
@@ -481,6 +483,14 @@ CEXPORT int indigoGetSGroupOriginalId (int sgroup);
 CEXPORT int indigoSetSGroupOriginalId (int sgroup, int original);
 CEXPORT int indigoGetSGroupParentId (int sgroup);
 CEXPORT int indigoSetSGroupParentId (int sgroup, int parent);
+
+CEXPORT int indigoAddTemplate (int molecule, int templates, const char *tname);
+CEXPORT int indigoRemoveTemplate (int molecule, const char *tname);
+CEXPORT int indigoFindTemplate (int molecule, const char *tname);
+
+CEXPORT const char * indigoGetSTroupClass (int tgroup);
+CEXPORT const char * indigoGetSTroupName (int tgroup);
+CEXPORT const char * indigoGetSTroupAlias (int tgroup);
 
 CEXPORT int indigoTransformSCSRtoCTAB (int item);
 CEXPORT int indigoTransformCTABtoSCSR (int molecule, int templates);
@@ -551,6 +561,9 @@ CEXPORT int indigoValidateChirality (int handle);
 CEXPORT int indigoAddAtom (int molecule, const char *symbol);
 // Set a new atom instead of specified
 CEXPORT int indigoResetAtom (int atom, const char *symbol);
+
+CEXPORT const char * indigoGetTemplateAtomClass (int atom);
+CEXPORT int indigoSetTemplateAtomClass (int atom, const char *name);
 
 // Accepts Rsite name "R" (or just ""), "R1", "R2" or list with names "R1 R3"
 CEXPORT int indigoAddRSite (int molecule, const char *name);
@@ -773,6 +786,7 @@ CEXPORT const char * indigoRawData (int item);
 // Applicable to items returned by SDF/RDF iterators.
 // Returns the offset in the SDF/RDF file.
 CEXPORT int indigoTell (int handle);
+CEXPORT long long indigoTell64(int handle);
 
 // Saves the molecule to an SDF output stream
 CEXPORT int indigoSdfAppend (int output, int item);

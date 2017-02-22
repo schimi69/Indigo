@@ -66,7 +66,7 @@ MoleculeCleaner2d::MoleculeCleaner2d(BaseMolecule& mol, bool use_biconnected_dec
 
 MoleculeCleaner2d::MoleculeCleaner2d(BaseMolecule& mol, bool use_biconnected_decompose, const Array<int>& selected_vertices)
     : MoleculeCleaner2d(mol, use_biconnected_decompose) {
-    active_points.clear_resize(selected_vertices.size());
+    active_points.clear_resize(mol.vertexEnd());
     active_points.zerofill();
     for (int i = 0; i < selected_vertices.size(); i++)
         active_points[selected_vertices[i]] = true;
@@ -652,7 +652,7 @@ void MoleculeCleaner2d::_updateGradient2() {
         if (active_points[base_point[i]]) gradient[i] = _energyDiff(base_point[i]);
 }
 
-void MoleculeCleaner2d::clean(bool _clean_external_angles) {
+void MoleculeCleaner2d::do_clean(bool _clean_external_angles) {
     if (_isZero()) return;
     if (is_trivial) return; // nothing to do for biconnected graph
     clean_external_angles = _clean_external_angles;
@@ -808,10 +808,10 @@ float MoleculeCleaner2d::_energy() {
                     float alpha;
 
                     if (fabs(cos) < 0.5) {
-                        alpha = acos_stable(cos)* signcross;
+                        alpha = Vec2f::acos_stable(cos)* signcross;
                     }
                     else {
-                        alpha = asin_stable(sin);
+                        alpha = Vec2f::asin_stable(sin);
                         if (cos < 0) {
                             if (alpha > 0) alpha = PI - alpha;
                             else alpha = -PI - alpha;
@@ -901,10 +901,10 @@ float MoleculeCleaner2d::_angleEnergy(int i, int v1, int v2) {
     float alpha;
 
     if (fabs(cos) < 0.5) {
-        alpha = acos_stable(cos)* signcross;
+        alpha = Vec2f::acos_stable(cos)* signcross;
     }
     else {
-        alpha = asin_stable(sin);
+        alpha = Vec2f::asin_stable(sin);
         if (cos < 0) {
             if (alpha > 0) alpha = PI - alpha;
             else alpha = -PI - alpha;
@@ -927,4 +927,11 @@ bool MoleculeCleaner2d::_isZero() {
         is_zero = is_zero & _mol.getAtomXyz(v).y == 0;
     }
     return is_zero;
+}
+
+void MoleculeCleaner2d::clean(BaseMolecule& mol) {
+	MoleculeCleaner2d cleaner2d1(mol, false);
+	cleaner2d1.do_clean(false);
+	MoleculeCleaner2d cleaner2d2(mol, true);
+	cleaner2d2.do_clean(true);
 }

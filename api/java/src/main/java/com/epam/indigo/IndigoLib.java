@@ -142,6 +142,7 @@ public interface IndigoLib extends Library
    int indigoIterateRGroups (int molecule);
    int indigoIsPseudoatom (int atom);
    int indigoIsRSite (int atom);
+   int indigoIsTemplateAtom (int atom);
 
    int indigoStereocenterType (int atom);
    int indigoStereocenterGroup (int atom);
@@ -153,6 +154,7 @@ public interface IndigoLib extends Library
    int indigoAddStereocenter (int atom, int type, int v1, int v2, int v3, int v4);
 
    int indigoIterateRGroupFragments (int rgroup);
+   int indigoCountRGroups (int molecule);
    int indigoCountAttachmentPoints (int rgroup);
 
    Pointer indigoSymbol (int atom);
@@ -167,6 +169,7 @@ public interface IndigoLib extends Library
    int indigoValence (int atom);
    int indigoCheckValence (int atom);
    int indigoCheckQuery (int item);
+   int indigoCheckRGroups (int item);
    int indigoCountHydrogens (int atom, IntByReference valence);
    int indigoCountImplicitHydrogens (int item);
 
@@ -187,6 +190,7 @@ public interface IndigoLib extends Library
    int indigoIterateRepeatingUnits (int molecule);
    int indigoIterateMultipleGroups (int molecule);
    int indigoIterateSGroups (int molecule);
+   int indigoIterateTGroups (int molecule);
 
    int indigoGetSuperatom (int molecule, int index);
    int indigoGetDataSGroup (int molecule, int index);
@@ -213,9 +217,12 @@ public interface IndigoLib extends Library
    int indigoSetSGroupDisplayOption (int sgroup, int option);
    int indigoGetSGroupSeqId (int sgroup);
    int indigoGetSGroupMultiplier (int sgroup);
+   Pointer indigoGetRepeatingUnitSubscript (int sgroup);
+   int indigoGetRepeatingUnitConnectivity (int sgroup);
    int indigoSetSGroupMultiplier (int sgroup, int mult);
    int indigoSetSGroupBrackets(int sgroup, int brk_style, float x1, float y1, float x2, float y2,
                                      float x3, float y3, float x4, float y4);
+   Pointer indigoGetSGroupCoords(int sgroup);
 
    int indigoSetSGroupData (int sgroup,  String data);
    int indigoSetSGroupCoords (int sgroup, float x, float y);
@@ -240,8 +247,19 @@ public interface IndigoLib extends Library
    int indigoGetSGroupParentId (int sgroup);
    int indigoSetSGroupParentId (int sgroup, int parent);
 
+   int indigoAddTemplate (int molecule, int templates, String name);
+   int indigoRemoveTemplate (int molecule, String name);
+   int indigoFindTemplate (int molecule, String name);
+
+   Pointer indigoGetTGroupClass(int tgroup);
+   Pointer indigoGetTGroupName(int tgroup);
+   Pointer indigoGetTGroupAlias(int tgroup);
+
    int indigoTransformSCSRtoCTAB (int molecule);
    int indigoTransformCTABtoSCSR (int molecule, int templates);
+
+   Pointer indigoGetTemplateAtomClass(int atom);
+   int indigoSetTemplateAtomClass(int atom, String name);
 
    int indigoResetCharge (int atom);
    int indigoResetExplicitValence (int atom);
@@ -328,6 +346,7 @@ public interface IndigoLib extends Library
    double indigoMolecularWeight (int molecule);
    double indigoMostAbundantMass (int molecule);
    double indigoMonoisotopicMass (int molecule);
+   Pointer indigoMassComposition (int molecule);
 
    Pointer indigoCanonicalSmiles (int molecule);
    Pointer indigoLayeredCode (int molecule);
@@ -353,6 +372,8 @@ public interface IndigoLib extends Library
    int indigoUnfoldHydrogens (int item);
 
    int indigoLayout (int object);
+
+   int indigoClean2d (int object);
 
    Pointer indigoSmiles (int item);
 
@@ -435,6 +456,8 @@ public interface IndigoLib extends Library
    int indigoMapMolecule (int match, int query_reaction_molecule);
 
    int indigoExtractCommonScaffold (int structures, String options);
+   int indigoRGroupComposition (int molecule, String options);
+   int indigoGetFragmentedMolecule (int molecule, String options);
    int indigoAllScaffolds (int extracted);
    int indigoDecomposeMolecules (int scaffold, int structures);
    int indigoDecomposedMoleculeScaffold (int decomp);

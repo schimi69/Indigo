@@ -36,7 +36,7 @@ public:
    bool isEOF ();
    void readNext ();
 
-   int tell ();
+   long long tell ();
    int currentNumber ();
    int count ();
 
@@ -51,10 +51,10 @@ public:
 protected:
    Scanner *_scanner;
    bool     _own_scanner;
-   TL_CP_DECL(Array<int>, _offsets);
+   TL_CP_DECL(Array<long long>, _offsets);
    TL_CP_DECL(Array<char>, _preread);
    int _current_number;
-   int _max_offset;
+   long long _max_offset;
 };
 
 }

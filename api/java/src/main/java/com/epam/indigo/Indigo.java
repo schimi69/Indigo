@@ -78,6 +78,7 @@ public class Indigo {
     public Indigo(String path) {
         _path = path;
         loadIndigo(path);
+        System.setProperty("jna.encoding", "UTF-8");
 
         _sid = _lib.indigoAllocSessionId();
     }
@@ -113,8 +114,7 @@ public class Indigo {
     static public String checkResultString(Object obj, Pointer result) {
         if (result == Pointer.NULL)
             throw new IndigoException(obj, _lib.indigoGetLastError());
-
-        return result.getString(0, false);
+        return result.getString(0);
     }
 
     static public Pointer checkResultPointer(Object obj, Pointer result) {
@@ -476,6 +476,11 @@ public class Indigo {
         return new IndigoObject(this, checkResult(this, _lib.indigoLoadMoleculeFromFile(path)));
     }
 
+    public IndigoObject loadMoleculeFromBuffer(byte[] buf) {
+        setSessionID();
+        return new IndigoObject(this, checkResult(this, _lib.indigoLoadMoleculeFromBuffer(buf, buf.length)));
+    }
+
     public IndigoObject loadQueryMolecule(String str) {
         setSessionID();
         return new IndigoObject(this, checkResult(this, _lib.indigoLoadQueryMoleculeFromString(str)));
@@ -674,6 +679,22 @@ public class Indigo {
         return extractCommonScaffold(toIndigoArray(structures), options);
     }
 
+    public IndigoObject rgroupComposition(IndigoObject molecule, String options) {
+        setSessionID();
+        int res = checkResult(this, molecule, _lib.indigoRGroupComposition(molecule.self, options));
+        if (res == 0)
+            return null;
+        return new IndigoObject(this, res);
+    }
+
+    public IndigoObject getFragmentedMolecule(IndigoObject molecule, String options) {
+        setSessionID();
+        int res = checkResult(this, molecule, _lib.indigoGetFragmentedMolecule(molecule.self, options));
+        if (res == 0)
+            return null;
+        return new IndigoObject(this, res);
+    }
+
     /**
      * Use createDecomposer() and decomposeMolecule()
      */
@@ -844,7 +865,14 @@ public class Indigo {
         return checkResult(this, _lib.indigoBuildPkaModel(level, threshold, filename));
     }
 
+    public IndigoObject nameToStructure(String name) {
+        return nameToStructure(name, "");
+    }
+
     public IndigoObject nameToStructure(String name, String params) {
+        if (params == null) {
+            params = "";
+        }
         setSessionID();
         int result = checkResult(this, _lib.indigoNameToStructure(name, params));
         if(result == 0)

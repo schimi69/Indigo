@@ -279,6 +279,13 @@ public class IndigoObject implements Iterator<IndigoObject>, Iterable<IndigoObje
       return new IndigoObject(dispatcher, Indigo.checkResult(this, _lib.indigoIterateRGroupFragments(self)), this);
    }
 
+   public int countRGroups ()
+   {
+      dispatcher.setSessionID();
+      return Indigo.checkResult(this, _lib.indigoCountRGroups(self));
+   }
+
+
    public int countAttachmentPoints ()
    {
       dispatcher.setSessionID();
@@ -295,6 +302,12 @@ public class IndigoObject implements Iterator<IndigoObject>, Iterable<IndigoObje
    {
       dispatcher.setSessionID();
       return Indigo.checkResult(this, _lib.indigoIsRSite(self)) == 1;
+   }
+
+   public boolean isTemplateAtom ()
+   {
+      dispatcher.setSessionID();
+      return Indigo.checkResult(this, _lib.indigoIsTemplateAtom(self)) == 1;
    }
 
    public int stereocenterType ()
@@ -423,6 +436,12 @@ public class IndigoObject implements Iterator<IndigoObject>, Iterable<IndigoObje
    {
       dispatcher.setSessionID();
       return Indigo.checkResult(this, _lib.indigoCheckQuery(self));
+   }
+
+   public int checkRGroups()
+   {
+      dispatcher.setSessionID();
+      return Indigo.checkResult(this, _lib.indigoCheckRGroups(self));
    }
 
    public Integer countHydrogens ()
@@ -843,6 +862,12 @@ public class IndigoObject implements Iterator<IndigoObject>, Iterable<IndigoObje
       return Indigo.checkResultDouble(this, _lib.indigoMonoisotopicMass(self));
    }
 
+   public String massComposition()
+   {
+      dispatcher.setSessionID();
+      return Indigo.checkResultString(this, _lib.indigoMassComposition(self));
+   }
+
    public String canonicalSmiles()
    {
       dispatcher.setSessionID();
@@ -964,6 +989,12 @@ public class IndigoObject implements Iterator<IndigoObject>, Iterable<IndigoObje
    {
       dispatcher.setSessionID();
       return new IndigoObject(dispatcher, Indigo.checkResult(this, _lib.indigoIterateSGroups(self)), this);
+   }
+
+   public IndigoObject iterateTGroups()
+   {
+      dispatcher.setSessionID();
+      return new IndigoObject(dispatcher, Indigo.checkResult(this, _lib.indigoIterateTGroups(self)), this);
    }
 
    public IndigoObject getDataSGroup(int index)
@@ -1090,10 +1121,29 @@ public class IndigoObject implements Iterator<IndigoObject>, Iterable<IndigoObje
       return Indigo.checkResult(this, _lib.indigoGetSGroupSeqId(self));
    }
 
+   public float[] getSGroupCoords()
+   {
+      dispatcher.setSessionID();
+      Pointer ptr = Indigo.checkResultPointer(this, _lib.indigoGetSGroupCoords(self));
+      return ptr.getFloatArray(0, 2);
+   }
+
    public int setSGroupDisplayOption(int option)
    {
       dispatcher.setSessionID();
       return Indigo.checkResult(this, _lib.indigoSetSGroupDisplayOption(self, option));
+   }
+
+   public String getRepeatingUnitSubscript()
+   {
+      dispatcher.setSessionID();
+      return Indigo.checkResultString(this, _lib.indigoGetRepeatingUnitSubscript(self));
+   }
+
+   public int getRepeatingUnitConnectivity()
+   {
+      dispatcher.setSessionID();
+      return Indigo.checkResult(this, _lib.indigoGetRepeatingUnitConnectivity(self));
    }
 
    public int getSGroupMultiplier()
@@ -1258,6 +1308,48 @@ public class IndigoObject implements Iterator<IndigoObject>, Iterable<IndigoObje
       return Indigo.checkResult(this, _lib.indigoSetSGroupParentId(self, parent));
    }
 
+   public int addTemplate(IndigoObject templates, String name)
+   {
+      if (name == null)
+         name = "";
+      dispatcher.setSessionID();
+      return Indigo.checkResult(this, _lib.indigoAddTemplate(self, templates.self, name));
+   }
+
+   public int removeTemplate(String name)
+   {
+      if (name == null)
+         name = "";
+      dispatcher.setSessionID();
+      return Indigo.checkResult(this, _lib.indigoRemoveTemplate(self, name));
+   }
+
+   public int findTemplate(String name)
+   {
+      if (name == null)
+         name = "";
+      dispatcher.setSessionID();
+      return Indigo.checkResult(this, _lib.indigoFindTemplate(self, name));
+   }
+
+   public String getTGroupClass()
+   {
+      dispatcher.setSessionID();
+      return Indigo.checkResultString(this, _lib.indigoGetTGroupClass(self));
+   }
+
+   public String getTGroupName()
+   {
+      dispatcher.setSessionID();
+      return Indigo.checkResultString(this, _lib.indigoGetTGroupName(self));
+   }
+
+   public String getTGroupAlias()
+   {
+      dispatcher.setSessionID();
+      return Indigo.checkResultString(this, _lib.indigoGetTGroupAlias(self));
+   }
+
    public int transformSCSRtoCTAB()
    {
       dispatcher.setSessionID();
@@ -1268,6 +1360,20 @@ public class IndigoObject implements Iterator<IndigoObject>, Iterable<IndigoObje
    {
       dispatcher.setSessionID();
       return Indigo.checkResult(this, _lib.indigoTransformCTABtoSCSR(self, templates.self));
+   }
+
+   public String getTemplateAtomClass()
+   {
+      dispatcher.setSessionID();
+      return Indigo.checkResultString(this, _lib.indigoGetTemplateAtomClass(self));
+   }
+
+   public int setTemplateAtomClass(String name)
+   {
+      if (name == null)
+         name = "";
+      dispatcher.setSessionID();
+      return Indigo.checkResult(this, _lib.indigoSetTemplateAtomClass(self, name));
    }
 
    public int setSGroupBrackets(int brk_style, float x1, float y1, float x2, float y2,
@@ -1403,6 +1509,12 @@ public class IndigoObject implements Iterator<IndigoObject>, Iterable<IndigoObje
    {
       dispatcher.setSessionID();
       Indigo.checkResult(this, _lib.indigoLayout(self));
+   }
+
+   public void clean2d()
+   {
+      dispatcher.setSessionID();
+      Indigo.checkResult(this, _lib.indigoClean2d(self));
    }
 
    public String smiles()

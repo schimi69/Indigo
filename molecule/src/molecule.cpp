@@ -153,6 +153,8 @@ void Molecule::_mergeWithSubmolecule (BaseMolecule &bmol, const Array<int> &vert
          _bond_orders.expand(idx + 1);
          _bond_orders[idx] = mol._bond_orders[i];
       }
+   
+   _aromaticity.clear();
 }
 
 /*
@@ -340,6 +342,16 @@ void Molecule::setTemplateAtom (int idx, const char *text)
    occur.name_idx = _template_names.add(text);
    occur.seq_id = -1;
    occur.contracted = -1;
+   updateEditRevision();
+}
+
+void Molecule::setTemplateAtomName (int idx, const char *text)
+{
+   if (_atoms[idx].number != ELEM_TEMPLATE)
+      throw Error("setTemplateAtomClass(): atom #%d is not a template atom", idx);
+
+   _TemplateOccurrence &occur = _template_occurrences.at(_atoms[idx].template_occur_idx);
+   occur.name_idx = _template_names.add(text);
    updateEditRevision();
 }
 
@@ -1544,17 +1556,14 @@ void Molecule::checkForConsistency (Molecule &mol)
    // Try to restore hydrogens in aromatic cycles first
    mol.restoreAromaticHydrogens();
 
-   int i;
-   for (i = mol.vertexBegin(); i < mol.vertexEnd(); i = mol.vertexNext(i))
+   for (int i : mol.vertices())
    {
-      const Vertex &vertex = mol.getVertex(i);
-
       if (mol.isPseudoAtom(i) || mol.isRSite(i) || mol.isTemplateAtom(i))
          continue;
 
       // check that we are sure about valence
       // (if the radical is not set, it is calculated from the valence anyway)
-      int val = mol.getAtomValence(i);
+      mol.getAtomValence(i);
 
       // check that we are sure about implicit H counter and valence
       mol.getImplicitH(i);
