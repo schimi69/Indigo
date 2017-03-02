@@ -72,7 +72,7 @@ def build_libs(cl_args):
     else:
         system = platform.system()
         if system == 'Darwin':
-            preset = 'mac{}'.format(platform.mac_ver()[0])
+            preset = 'mac{}'.format('.'.join(platform.mac_ver()[0].split('.')[:2]))
         elif system == 'Linux':
             preset = 'linux{}'.format(platform.architecture()[0][:2])
         elif system == 'Windows':
@@ -174,7 +174,7 @@ def build_libs(cl_args):
         check_call("mingw32-make install", shell=True)
     else:
         print("Do not know how to run package and install target")
-    check_call("ctest -V --timeout 20 -C %s ." % (args.config), shell=True)
+    check_call("ctest -V --timeout 60 -C %s ." % (args.config), shell=True)
 
     os.chdir(root)
     if not os.path.exists("dist"):
