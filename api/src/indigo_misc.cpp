@@ -107,6 +107,93 @@ CEXPORT int indigoSetOptionXY (const char *name, int x, int y)
    INDIGO_END(-1)
 }
 
+CEXPORT const char* indigoGetOption (const char *name)
+{
+   INDIGO_BEGIN
+   {
+        auto &tmp = self.getThreadTmpData();
+        indigoGetOptionManager().getOptionValueStr(name, tmp.string);
+        return tmp.string.ptr();
+   }
+   INDIGO_END(0)
+}
+
+CEXPORT int indigoGetOptionInt (const char *name, int* value)
+{
+   INDIGO_BEGIN
+   {
+      if(value)
+      {
+        indigoGetOptionManager().getOptionValueInt(name, *value);
+        return 1;
+      }
+   }
+   INDIGO_END(-1)
+}
+
+CEXPORT int indigoGetOptionBool (const char *name, int* value)
+{
+   INDIGO_BEGIN
+   {
+      if(value)
+      {
+        indigoGetOptionManager().getOptionValueBool(name, *value);
+        return 1;
+      }
+   }
+   INDIGO_END(-1)
+}
+
+CEXPORT int indigoGetOptionFloat (const char *name, float* value)
+{
+   INDIGO_BEGIN
+   {
+      if(value)
+      {
+        indigoGetOptionManager().getOptionValueFloat(name, *value);
+        return 1;
+      }
+   }
+   INDIGO_END(-1)
+}
+
+CEXPORT int indigoGetOptionColor (const char *name, float* r, float* g, float* b)
+{
+   INDIGO_BEGIN
+   {
+      if(r && g && b)
+      {
+        indigoGetOptionManager().getOptionValueColor(name, *r, *g, *b);
+        return 1;
+      }
+   }
+   INDIGO_END(-1)
+}
+
+CEXPORT int indigoGetOptionXY (const char *name, int* x, int* y)
+{
+   INDIGO_BEGIN
+   {
+      if(x && y)
+      {
+        indigoGetOptionManager().getOptionValueXY(name, *x, *y);
+        return 1;
+      }
+   }
+   INDIGO_END(-1)
+}
+
+CEXPORT const char* indigoGetOptionType(const char* name)
+{
+   INDIGO_BEGIN
+   {
+        auto &tmp = self.getThreadTmpData();
+        indigoGetOptionManager().getOptionType(name, tmp.string);
+        return tmp.string.ptr();
+   }
+   INDIGO_END(0)
+}
+
 CEXPORT int indigoResetOptions ()
 {
    INDIGO_BEGIN

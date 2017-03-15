@@ -59,42 +59,26 @@ IndigoRenderer::~IndigoRenderer ()
 {
 }
 
-void indigoRenderSetCommentOffset (int offset)
-{
-   RenderParams& rp = indigoRendererGetInstance().renderParams;
-   rp.cnvOpt.commentOffset = offset;
-}
+#define SET_POSITIVE_FLOAT_OPTION(option, error)                   \
+   [](float value) {                                               \
+      if (value <= 0.0f)                                           \
+        throw IndigoError(error);                                  \
+      option = value;                                              \
+   },                                                              \
+   [](float& value) {                                              \
+      value = option;                                              \
+   }  
 
-void indigoRenderSetImageWidth (int v)
-{
-   RenderParams& rp = indigoRendererGetInstance().renderParams;
-   rp.cnvOpt.width = v;
-}
-
-void indigoRenderSetImageHeight (int v)
-{
-   RenderParams& rp = indigoRendererGetInstance().renderParams;
-   rp.cnvOpt.height = v;
-}
-
-void indigoRenderSetImageMaxWidth (int v)
-{
-   RenderParams& rp = indigoRendererGetInstance().renderParams;
- 
-   rp.cnvOpt.maxWidth = v;
-}
-
-void indigoRenderSetImageMaxHeight (int v)
-{
-   RenderParams& rp = indigoRendererGetInstance().renderParams;
-   rp.cnvOpt.maxHeight = v;
-}
-
-void indigoRenderSetTitleOffset (int offset)
-{
-   RenderParams& rp = indigoRendererGetInstance().renderParams;
-   rp.cnvOpt.titleOffset = offset;
-}                    
+#define CHECK_AND_SETTER_GETTER_COLOR_OPTION(option)                         \
+   [](float r, float g, float b) {                                 \
+      CHECKRGB(r, g, b);                                           \
+      option.set(r, g, b);                                         \
+   },                                                              \
+   [](float& r, float& g, float& b) {                              \
+      r = option.x;                                                \
+      g = option.y;                                                \
+      b = option.z;                                                \
+   }
 
 DINGO_MODE indigoRenderMapOutputFormat (const char *format)
 {
@@ -109,139 +93,30 @@ DINGO_MODE indigoRenderMapOutputFormat (const char *format)
    return outFmtMap.find(format) ? (DINGO_MODE)outFmtMap.at(format) : MODE_NONE;
 }
 
+const char* indigoRenderOutputFormatToString (DINGO_MODE mode)
+{
+    switch(mode)
+    {
+        case MODE_PDF: return "pdf";
+        case MODE_PNG: return "png";
+        case MODE_SVG: return "svg";
+        case MODE_EMF: return "emf";
+        case MODE_CDXML: return "cdxml";
+        default: return "none";
+    }
+}
+
 void indigoRenderSetOutputFormat (const char *format)
 {
    RenderParams& rp = indigoRendererGetInstance().renderParams;
    rp.rOpt.mode = indigoRenderMapOutputFormat(format);
 }
 
-void indigoRenderSetImageSize (int width, int height)
+void indigoRenderGetOutputFormat (Array<char>& value)
 {
    RenderParams& rp = indigoRendererGetInstance().renderParams;
-   rp.cnvOpt.width = width;
-   rp.cnvOpt.height = height;
-}
-
-void indigoRenderSetHDCOffset (int x, int y)
-{
-   RenderParams& rp = indigoRendererGetInstance().renderParams;
-   rp.cnvOpt.xOffset = x;
-   rp.cnvOpt.yOffset = y;
-}
-
-void indigoRenderSetMargins (int x, int y)
-{
-   RenderParams& rp = indigoRendererGetInstance().renderParams;
-   rp.cnvOpt.marginX = x;
-   rp.cnvOpt.marginY = y;
-}
-
-void indigoRenderSetGridMargins (int x, int y)
-{
-   RenderParams& rp = indigoRendererGetInstance().renderParams;
-   rp.cnvOpt.gridMarginX = x;
-   rp.cnvOpt.gridMarginY = y;
-}
-
-void indigoRenderSetBondLength (float length)
-{
-   RenderParams& rp = indigoRendererGetInstance().renderParams;
-   rp.cnvOpt.bondLength = length;
-}
-
-void indigoRenderSetRelativeThickness (float rt)
-{
-   RenderParams& rp = indigoRendererGetInstance().renderParams;
-   if (rt <= 0.0f)
-      throw IndigoError("relative thickness must be positive");
-   rp.relativeThickness = rt;
-}
-
-void indigoRenderSetBondLineWidth (float w)
-{
-   RenderParams& rp = indigoRendererGetInstance().renderParams;
-   if (w <= 0.0f)
-      throw IndigoError("bond line width factor must be positive");
-   rp.bondLineWidthFactor = w;
-}
-
-void indigoRenderSetBackgroundColor (float r, float g, float b)
-{
-   RenderParams& rp = indigoRendererGetInstance().renderParams;
-   rp.rOpt.backgroundColor.set((float)r, (float)g, (float)b);
-}
-
-void indigoRenderSetBaseColor (float r, float g, float b)
-{
-   RenderParams& rp = indigoRendererGetInstance().renderParams;
-   rp.rOpt.baseColor.set((float)r, (float)g, (float)b);
-}
-
-void indigoRenderSetImplicitHydrogenVisible (int enabled)
-{
-   RenderParams& rp = indigoRendererGetInstance().renderParams;
-   rp.rOpt.implHVisible = enabled != 0;
-}
-
-void indigoRenderSetHighlightedLabelsVisible (int enabled)
-{
-   RenderParams& rp = indigoRendererGetInstance().renderParams;
-   rp.rOpt.highlightedLabelsVisible = enabled != 0;
-}
-
-void indigoRenderSetBoldBondDetection (int enabled)
-{
-   RenderParams& rp = indigoRendererGetInstance().renderParams;
-   rp.rOpt.boldBondDetection = enabled != 0;
-}
-
-void indigoRenderSetColoring (int enabled)
-{
-   RenderParams& rp = indigoRendererGetInstance().renderParams;
-   rp.rOpt.atomColoring = enabled != 0;
-}
-
-void indigoRenderSetValencesVisible (int enabled)
-{
-   RenderParams& rp = indigoRendererGetInstance().renderParams;
-   rp.rOpt.showValences = enabled != 0;
-}
-
-void indigoRenderSetAtomIdsVisible (int enabled)
-{
-   RenderParams& rp = indigoRendererGetInstance().renderParams;
-   rp.rOpt.showAtomIds = enabled != 0;
-}
-
-void indigoRenderSetBondIdsVisible (int enabled)
-{
-   RenderParams& rp = indigoRendererGetInstance().renderParams;
-   rp.rOpt.showBondIds = enabled != 0;
-}
-
-void indigoRenderSetAtomBondIdsFromOne (int enabled)
-{
-   RenderParams& rp = indigoRendererGetInstance().renderParams;
-   rp.rOpt.atomBondIdsFromOne = enabled != 0;
-}
-
-void indigoRenderSetHighlightThicknessEnabled (int enabled)
-{
-   RenderParams& rp = indigoRendererGetInstance().renderParams;
-   rp.rOpt.highlightThicknessEnable = enabled != 0;
-}
-
-void indigoRenderSetHighlightColorEnabled (int enabled)
-{
-   RenderParams& rp = indigoRendererGetInstance().renderParams;
-   rp.rOpt.highlightColorEnable = enabled != 0;
-}
-
-void indigoRenderSetHighlightColor (float r, float g, float b)
-{
-   CHECKRGB(r, g, b);
-   RenderParams& rp = indigoRendererGetInstance().renderParams;
-   rp.rOpt.highlightColor.set(r, g, b);
+   const char* mode = indigoRenderOutputFormatToString(rp.rOpt.mode);
+   value.readString(mode, true);
 }
 
 void indigoRenderSetStereoStyle (const char* mode)
@@ -254,6 +129,17 @@ void indigoRenderSetStereoStyle (const char* mode)
    }
    RenderParams& rp = indigoRendererGetInstance().renderParams;
    rp.rOpt.stereoMode = (STEREO_STYLE)stereoStyleMap.at(mode);
+}
+
+void indigoRenderGetStereoStyle (Array<char>& value)
+{
+    RenderParams& rp = indigoRendererGetInstance().renderParams;
+    switch(rp.rOpt.stereoMode)
+    {
+        case STEREO_STYLE_EXT: value.readString("ext", true); break;
+        case STEREO_STYLE_OLD: value.readString("old", true); break;
+        case STEREO_STYLE_NONE: value.readString("none", true); break;
+    }
 }
 
 void indigoRenderSetLabelMode (const char* mode)
@@ -269,6 +155,18 @@ void indigoRenderSetLabelMode (const char* mode)
    rp.rOpt.labelMode = (LABEL_MODE)labelMap.at(mode);
 }
 
+void indigoRenderGetLabelMode (Array<char>& value)
+{
+    RenderParams& rp = indigoRendererGetInstance().renderParams;
+    switch(rp.rOpt.labelMode)
+    {
+        case LABEL_MODE_NONE: value.readString("none", true); break;
+        case LABEL_MODE_HETERO: value.readString("hetero", true); break;
+        case LABEL_MODE_TERMINAL_HETERO: value.readString("terminal-hetero", true); break;
+        case LABEL_MODE_ALL: value.readString("all", true); break;
+    }
+}
+
 void indigoRenderSetCatalystsPlacement (const char* mode)
 {
    TL_DECL_GET(StringIntMap, agentPlacementMap);
@@ -278,6 +176,15 @@ void indigoRenderSetCatalystsPlacement (const char* mode)
    }
    RenderParams& rp = indigoRendererGetInstance().renderParams;
    rp.rOpt.agentsBelowArrow = agentPlacementMap.at(mode) != 0;
+}
+
+void indigoRenderGetCatalystsPlacement (Array<char>& value)
+{
+    RenderParams& rp = indigoRendererGetInstance().renderParams;
+    if(rp.rOpt.agentsBelowArrow)
+        value.readString("above-and-below", true);
+    else
+        value.readString("above", true);
 }
 
 void indigoRenderSetSuperatomMode (const char* mode)
@@ -291,58 +198,14 @@ void indigoRenderSetSuperatomMode (const char* mode)
    rp.rOpt.collapseSuperatoms = stereoAtomMode.at(mode) != 0;
 }
 
-void indigoRenderSetAAMColor (float r, float g, float b)
+void indigoRenderGetSuperatomMode (Array<char>& value)
 {
-   CHECKRGB(r, g, b);
-   RenderParams& rp = indigoRendererGetInstance().renderParams;
-   rp.rOpt.aamColor.set(r, g, b);
+    RenderParams& rp = indigoRendererGetInstance().renderParams;
+    if(rp.rOpt.collapseSuperatoms)
+        value.readString("collapse", true);
+    else
+        value.readString("expand", true);
 }
-
-void indigoRenderSetCommentColor (float r, float g, float b)
-{
-   CHECKRGB(r, g, b);
-   RenderParams& rp = indigoRendererGetInstance().renderParams;
-   rp.rOpt.commentColor.set(r, g, b);
-}
-
-void indigoRenderSetDataSGroupColor (float r, float g, float b)
-{
-   CHECKRGB(r, g, b);
-   RenderParams& rp = indigoRendererGetInstance().renderParams;
-   rp.rOpt.dataGroupColor.set(r, g, b);
-}
-
-void indigoRenderSetCenterDoubleBondWhenStereoAdjacent (int enabled)
-{
-   RenderParams& rp = indigoRendererGetInstance().renderParams;
-   rp.rOpt.centerDoubleBondWhenStereoAdjacent = enabled != 0;
-}
-
-void indigoRenderSetComment (const char* comment)
-{
-   RenderParams& rp = indigoRendererGetInstance().renderParams;
-   rp.cnvOpt.comment.clear();
-   rp.cnvOpt.comment.appendString(comment, true);
-}
-
-void indigoRenderSetAtomColorProperty (const char* prop)
-{
-   RenderParams& rp = indigoRendererGetInstance().renderParams;
-   rp.rOpt.atomColorProp.clear();
-   rp.rOpt.atomColorProp.appendString(prop, true);
-}
-
-void indigoRenderSetCommentFontSize (float fontSize)
-{
-   RenderParams& rp = indigoRendererGetInstance().renderParams;
-   rp.rOpt.commentFontFactor = fontSize;
-}
-
-void indigoRenderSetTitleFontSize (float fontSize)
-{
-   RenderParams& rp = indigoRendererGetInstance().renderParams;
-   rp.rOpt.titleFontFactor = fontSize;
-}                                
 
 static MultilineTextLayout _parseTextLayout (const char *text)
 {
@@ -376,10 +239,21 @@ static MultilineTextLayout _parseTextLayout (const char *text)
       throw IndigoError("Option value is invalid");
 }
 
-void indigoRenderSetCommentSpacing (float spacing)
+static void layoutToText (const MultilineTextLayout& layout, Array<char>& value)
 {
-   RenderParams& rp = indigoRendererGetInstance().renderParams;
-   rp.rOpt.commentSpacing = spacing;
+    switch(layout.bbox_alignment)
+    {
+        case MultilineTextLayout::Left: value.readString("left", true); break;
+        case MultilineTextLayout::Right: value.readString("right", true); break;
+        case MultilineTextLayout::Center:
+            switch(layout.inbox_alignment)
+            {
+                case MultilineTextLayout::Left: value.readString("center-left", true); break;
+                case MultilineTextLayout::Right: value.readString("center-right", true); break;
+                case MultilineTextLayout::Center: value.readString("center", true); break;
+            }
+            break;
+    }
 }
 
 void indigoRenderSetCommentAlignment (const char *text)
@@ -388,16 +262,22 @@ void indigoRenderSetCommentAlignment (const char *text)
    rp.cnvOpt.commentAlign = _parseTextLayout(text);
 }
 
-void indigoRenderSetTitleSpacing (float spacing)
+void indigoRenderGetCommentAlignment (Array<char>& value)
 {
    RenderParams& rp = indigoRendererGetInstance().renderParams;
-   rp.rOpt.titleSpacing = spacing;
+   layoutToText(rp.cnvOpt.commentAlign, value);
 }
 
 void indigoRenderSetTitleAlignment (const char *text)
 {
    RenderParams& rp = indigoRendererGetInstance().renderParams;
    rp.cnvOpt.titleAlign = _parseTextLayout(text);
+}
+
+void indigoRenderGetTitleAlignment (Array<char>& value)
+{
+   RenderParams& rp = indigoRendererGetInstance().renderParams;
+   layoutToText(rp.cnvOpt.titleAlign, value);
 }
 
 void indigoRenderSetCommentPosition (const char* pos)
@@ -411,13 +291,14 @@ void indigoRenderSetCommentPosition (const char* pos)
    rp.cnvOpt.commentPos = (COMMENT_POS)map.at(pos);
 }
 
-void indigoRenderSetGridTitleProperty (const char* prop)
+void indigoRenderGetCommentPosition (Array<char>& value)
 {
    RenderParams& rp = indigoRendererGetInstance().renderParams;
-   rp.cnvOpt.titleProp.clear();
-   rp.cnvOpt.titleProp.appendString(prop, true);
+   if(rp.cnvOpt.commentPos == COMMENT_POS_TOP)
+       value.readString("top", true);
+   else
+       value.readString("bottom", true);
 }
-
 
 RenderCdxmlContext& getCdxmlContext() {
    RenderParams& rp = indigoRendererGetInstance().renderParams;
@@ -425,46 +306,6 @@ RenderCdxmlContext& getCdxmlContext() {
       rp.rOpt.cdxml_context.create();
    }
    return rp.rOpt.cdxml_context.ref();
-}
-
-
-void indigoRenderSetCdxmlTitleFont(const char* font)
-{
-   RenderCdxmlContext& context = getCdxmlContext();
-   context.titleFont.readString(font, true);
-}
-void indigoRenderSetCdxmlTitleFace(const char* face)
-{
-   RenderCdxmlContext& context = getCdxmlContext();
-   context.titleFace.readString(face, true);
-}
-
-void indigoRenderSetCdxmlPropertiesSize(float size)
-{
-   RenderCdxmlContext& context = getCdxmlContext();
-   context.propertyFontSize = size;
-}
-void indigoRenderSetCdxmlPropertiesFontTable(const char* fonttable)
-{
-   RenderCdxmlContext& context = getCdxmlContext();
-   context.fonttable.readString(fonttable, true);
-}
-void indigoRenderSetCdxmlPropertiesColorTable(const char* colortable)
-{
-   RenderCdxmlContext& context = getCdxmlContext();
-   context.colortable.readString(colortable, true);
-}
-
-void indigoRenderSetCdxmlPropertiesNameProperty(const char* name)
-{
-   RenderCdxmlContext& context = getCdxmlContext();
-   context.propertyNameCaption.readString(name, true);
-}
-
-void indigoRenderSetCdxmlPropertiesValueProperty(const char* value)
-{
-   RenderCdxmlContext& context = getCdxmlContext();
-   context.propertyValueCaption.readString(value, true);
 }
 
 void indigoRenderSetCdxmlPropertiesKeyAlignment(const char* value)
@@ -478,12 +319,13 @@ void indigoRenderSetCdxmlPropertiesKeyAlignment(const char* value)
       throw IndigoError("Option value alignment is invalid");
 }
 
-
-void indigoRenderSetCdxmlPropertiesEnabled(int enabled)
+void indigoRenderGetCdxmlPropertiesKeyAlignment(Array<char>& value)
 {
-   RenderCdxmlContext& context = getCdxmlContext();
-   context.enabled = (enabled != 0);
-
+    RenderCdxmlContext& context = getCdxmlContext();
+    if(context.keyAlignment == RenderCdxmlContext::ALIGNMENT_LEFT)
+        value.readString("left", true);
+    else
+        value.readString("right", true);
 }
 
 CEXPORT int indigoRender (int object, int output)
@@ -716,68 +558,71 @@ _IndigoRenderingOptionsHandlersSetter::_IndigoRenderingOptionsHandlersSetter ()
    OptionManager &mgr = indigoGetOptionManager();
    OsLocker locker(mgr.lock);
 
-   mgr.setOptionHandlerInt("render-comment-offset", indigoRenderSetCommentOffset);
-   mgr.setOptionHandlerInt("render-image-width", indigoRenderSetImageWidth);
-   mgr.setOptionHandlerInt("render-image-height", indigoRenderSetImageHeight);
-   mgr.setOptionHandlerInt("render-image-max-width", indigoRenderSetImageMaxWidth);
-   mgr.setOptionHandlerInt("render-image-max-height", indigoRenderSetImageMaxHeight);
-
-   mgr.setOptionHandlerString("render-output-format", indigoRenderSetOutputFormat);
-   mgr.setOptionHandlerString("render-label-mode", indigoRenderSetLabelMode);
-   mgr.setOptionHandlerString("render-comment", indigoRenderSetComment);
-   mgr.setOptionHandlerString("render-comment-position", indigoRenderSetCommentPosition);
-   mgr.setOptionHandlerString("render-stereo-style", indigoRenderSetStereoStyle);
-   mgr.setOptionHandlerString("render-catalysts-placement", indigoRenderSetCatalystsPlacement);
-   mgr.setOptionHandlerString("render-superatom-mode", indigoRenderSetSuperatomMode);
-   mgr.setOptionHandlerString("render-atom-color-property", indigoRenderSetAtomColorProperty);
-
-   mgr.setOptionHandlerBool("render-coloring", indigoRenderSetColoring);
-   mgr.setOptionHandlerBool("render-valences-visible", indigoRenderSetValencesVisible);
-   mgr.setOptionHandlerBool("render-atom-ids-visible", indigoRenderSetAtomIdsVisible);
-   mgr.setOptionHandlerBool("render-bond-ids-visible", indigoRenderSetBondIdsVisible);
-   mgr.setOptionHandlerBool("render-atom-bond-ids-from-one", indigoRenderSetAtomBondIdsFromOne);
-   mgr.setOptionHandlerBool("render-highlight-thickness-enabled", indigoRenderSetHighlightThicknessEnabled);
-   mgr.setOptionHandlerBool("render-highlight-color-enabled", indigoRenderSetHighlightColorEnabled);
-   mgr.setOptionHandlerBool("render-center-double-bond-when-stereo-adjacent", indigoRenderSetCenterDoubleBondWhenStereoAdjacent);
-   mgr.setOptionHandlerBool("render-implicit-hydrogens-visible", indigoRenderSetImplicitHydrogenVisible);
-   mgr.setOptionHandlerBool("render-highlighted-labels-visible", indigoRenderSetHighlightedLabelsVisible);
-   mgr.setOptionHandlerBool("render-bold-bond-detection", indigoRenderSetBoldBondDetection);
-
-   mgr.setOptionHandlerFloat("render-bond-length", indigoRenderSetBondLength);
-   mgr.setOptionHandlerFloat("render-relative-thickness", indigoRenderSetRelativeThickness);
-   mgr.setOptionHandlerFloat("render-bond-line-width", indigoRenderSetBondLineWidth);
-   mgr.setOptionHandlerFloat("render-comment-font-size", indigoRenderSetCommentFontSize);
-   mgr.setOptionHandlerString("render-comment-alignment", indigoRenderSetCommentAlignment);
-   mgr.setOptionHandlerFloat("render-comment-spacing", indigoRenderSetCommentSpacing);
-
-   mgr.setOptionHandlerColor("render-background-color", indigoRenderSetBackgroundColor);
-   mgr.setOptionHandlerColor("render-base-color", indigoRenderSetBaseColor);
-   mgr.setOptionHandlerColor("render-highlight-color", indigoRenderSetHighlightColor);
-   mgr.setOptionHandlerColor("render-aam-color", indigoRenderSetAAMColor);
-   mgr.setOptionHandlerColor("render-comment-color", indigoRenderSetCommentColor);
-   mgr.setOptionHandlerColor("render-data-sgroup-color", indigoRenderSetDataSGroupColor);
-
-   mgr.setOptionHandlerXY("render-image-size", indigoRenderSetImageSize);
-   mgr.setOptionHandlerXY("render-hdc-offset", indigoRenderSetHDCOffset);
-   mgr.setOptionHandlerXY("render-margins", indigoRenderSetMargins);
-
-   mgr.setOptionHandlerXY("render-grid-margins", indigoRenderSetGridMargins);
-   mgr.setOptionHandlerFloat("render-grid-title-spacing", indigoRenderSetTitleSpacing);
-   mgr.setOptionHandlerString("render-grid-title-alignment", indigoRenderSetTitleAlignment);
-   mgr.setOptionHandlerFloat("render-grid-title-font-size", indigoRenderSetTitleFontSize);
-   mgr.setOptionHandlerString("render-grid-title-property", indigoRenderSetGridTitleProperty);
-   mgr.setOptionHandlerInt("render-grid-title-offset", indigoRenderSetTitleOffset);
+   #define rp indigoRendererGetInstance().renderParams 
+   #define cdxmlContext getCdxmlContext()
    
+   mgr.setOptionHandlerInt("render-comment-offset", SETTER_GETTER_INT_OPTION(rp.cnvOpt.commentOffset));
+   mgr.setOptionHandlerInt("render-image-width", SETTER_GETTER_INT_OPTION(rp.cnvOpt.width));
+   mgr.setOptionHandlerInt("render-image-height", SETTER_GETTER_INT_OPTION(rp.cnvOpt.height));
+   mgr.setOptionHandlerInt("render-image-max-width", SETTER_GETTER_INT_OPTION(rp.cnvOpt.maxWidth));
+   mgr.setOptionHandlerInt("render-image-max-height", SETTER_GETTER_INT_OPTION(rp.cnvOpt.maxHeight));
 
-   mgr.setOptionHandlerBool("render-cdxml-properties-enabled", indigoRenderSetCdxmlPropertiesEnabled);
-   mgr.setOptionHandlerString("render-cdxml-properties-fonttable", indigoRenderSetCdxmlPropertiesFontTable);
-   mgr.setOptionHandlerString("render-cdxml-properties-colortable", indigoRenderSetCdxmlPropertiesColorTable);
-   mgr.setOptionHandlerString("render-cdxml-properties-name-property", indigoRenderSetCdxmlPropertiesNameProperty);
-   mgr.setOptionHandlerString("render-cdxml-properties-value-property", indigoRenderSetCdxmlPropertiesValueProperty);
-   mgr.setOptionHandlerString("render-cdxml-properties-key-alignment", indigoRenderSetCdxmlPropertiesKeyAlignment);
-   mgr.setOptionHandlerFloat("render-cdxml-properties-size", indigoRenderSetCdxmlPropertiesSize);
-   mgr.setOptionHandlerString("render-cdxml-title-font", indigoRenderSetCdxmlTitleFont);
-   mgr.setOptionHandlerString("render-cdxml-title-face", indigoRenderSetCdxmlTitleFace);
+   mgr.setOptionHandlerString("render-output-format", indigoRenderSetOutputFormat, indigoRenderGetOutputFormat);
+   
+   mgr.setOptionHandlerString("render-label-mode", indigoRenderSetLabelMode, indigoRenderGetLabelMode);
+   mgr.setOptionHandlerString("render-comment", SETTER_GETTER_STR_OPTION(rp.cnvOpt.comment));
+   mgr.setOptionHandlerString("render-comment-position", indigoRenderSetCommentPosition, indigoRenderGetCommentPosition);
+   mgr.setOptionHandlerString("render-stereo-style", indigoRenderSetStereoStyle, indigoRenderGetStereoStyle);
+   mgr.setOptionHandlerString("render-catalysts-placement", indigoRenderSetCatalystsPlacement, indigoRenderGetCatalystsPlacement);
+   mgr.setOptionHandlerString("render-superatom-mode", indigoRenderSetSuperatomMode, indigoRenderGetSuperatomMode);
+   mgr.setOptionHandlerString("render-atom-color-property", SETTER_GETTER_STR_OPTION(rp.rOpt.atomColorProp));
+
+   mgr.setOptionHandlerBool("render-coloring", SETTER_GETTER_BOOL_OPTION(rp.rOpt.atomColoring));
+   mgr.setOptionHandlerBool("render-valences-visible", SETTER_GETTER_BOOL_OPTION(rp.rOpt.showValences));
+   mgr.setOptionHandlerBool("render-atom-ids-visible", SETTER_GETTER_BOOL_OPTION(rp.rOpt.showAtomIds));
+   mgr.setOptionHandlerBool("render-bond-ids-visible", SETTER_GETTER_BOOL_OPTION(rp.rOpt.showBondIds));
+   mgr.setOptionHandlerBool("render-atom-bond-ids-from-one", SETTER_GETTER_BOOL_OPTION(rp.rOpt.atomBondIdsFromOne));
+   mgr.setOptionHandlerBool("render-highlight-thickness-enabled", SETTER_GETTER_BOOL_OPTION(rp.rOpt.highlightThicknessEnable));
+   mgr.setOptionHandlerBool("render-highlight-color-enabled", SETTER_GETTER_BOOL_OPTION(rp.rOpt.highlightColorEnable));
+   mgr.setOptionHandlerBool("render-center-double-bond-when-stereo-adjacent", SETTER_GETTER_BOOL_OPTION(rp.rOpt.centerDoubleBondWhenStereoAdjacent));
+   mgr.setOptionHandlerBool("render-implicit-hydrogens-visible", SETTER_GETTER_BOOL_OPTION(rp.rOpt.implHVisible));
+   mgr.setOptionHandlerBool("render-highlighted-labels-visible", SETTER_GETTER_BOOL_OPTION(rp.rOpt.highlightedLabelsVisible));
+   mgr.setOptionHandlerBool("render-bold-bond-detection", SETTER_GETTER_BOOL_OPTION(rp.rOpt.boldBondDetection));
+
+   mgr.setOptionHandlerFloat("render-bond-length", SETTER_GETTER_FLOAT_OPTION(rp.cnvOpt.bondLength));
+   mgr.setOptionHandlerFloat("render-relative-thickness", SET_POSITIVE_FLOAT_OPTION(rp.relativeThickness, "relative thickness must be positive"));
+   mgr.setOptionHandlerFloat("render-bond-line-width", SET_POSITIVE_FLOAT_OPTION(rp.bondLineWidthFactor, "bond line width factor must be positive")); 
+   mgr.setOptionHandlerFloat("render-comment-font-size", SETTER_GETTER_FLOAT_OPTION(rp.rOpt.commentFontFactor));
+   mgr.setOptionHandlerString("render-comment-alignment", indigoRenderSetCommentAlignment, indigoRenderGetCommentAlignment);
+   mgr.setOptionHandlerFloat("render-comment-spacing", SETTER_GETTER_FLOAT_OPTION(rp.rOpt.commentSpacing));
+
+   mgr.setOptionHandlerColor("render-background-color", SETTER_GETTER_COLOR_OPTION(rp.rOpt.backgroundColor));
+   mgr.setOptionHandlerColor("render-base-color", SETTER_GETTER_COLOR_OPTION(rp.rOpt.baseColor));
+   mgr.setOptionHandlerColor("render-highlight-color", CHECK_AND_SETTER_GETTER_COLOR_OPTION(rp.rOpt.highlightColor));
+   mgr.setOptionHandlerColor("render-aam-color", CHECK_AND_SETTER_GETTER_COLOR_OPTION(rp.rOpt.aamColor));
+   mgr.setOptionHandlerColor("render-comment-color", CHECK_AND_SETTER_GETTER_COLOR_OPTION(rp.rOpt.commentColor));
+   mgr.setOptionHandlerColor("render-data-sgroup-color", CHECK_AND_SETTER_GETTER_COLOR_OPTION(rp.rOpt.dataGroupColor));
+
+   mgr.setOptionHandlerXY("render-image-size", SETTER_GETTER_XY_OPTION(rp.cnvOpt.width, rp.cnvOpt.height));
+   mgr.setOptionHandlerXY("render-hdc-offset", SETTER_GETTER_XY_OPTION(rp.cnvOpt.xOffset, rp.cnvOpt.yOffset));
+   mgr.setOptionHandlerXY("render-margins", SETTER_GETTER_XY_OPTION(rp.cnvOpt.marginX, rp.cnvOpt.marginY));
+
+   mgr.setOptionHandlerXY("render-grid-margins", SETTER_GETTER_XY_OPTION(rp.cnvOpt.gridMarginX, rp.cnvOpt.gridMarginY));
+   mgr.setOptionHandlerFloat("render-grid-title-spacing", SETTER_GETTER_FLOAT_OPTION(rp.rOpt.titleSpacing));
+   mgr.setOptionHandlerString("render-grid-title-alignment", indigoRenderSetTitleAlignment, indigoRenderGetTitleAlignment);
+   mgr.setOptionHandlerFloat("render-grid-title-font-size", SETTER_GETTER_FLOAT_OPTION(rp.rOpt.titleFontFactor));
+   mgr.setOptionHandlerString("render-grid-title-property", SETTER_GETTER_STR_OPTION(rp.cnvOpt.titleProp));
+   mgr.setOptionHandlerInt("render-grid-title-offset", SETTER_GETTER_INT_OPTION(rp.cnvOpt.titleOffset));
+
+   mgr.setOptionHandlerBool("render-cdxml-properties-enabled", SETTER_GETTER_BOOL_OPTION(cdxmlContext.enabled));
+   mgr.setOptionHandlerString("render-cdxml-properties-fonttable", SETTER_GETTER_STR_OPTION(cdxmlContext.fonttable));
+   mgr.setOptionHandlerString("render-cdxml-properties-colortable", SETTER_GETTER_STR_OPTION(cdxmlContext.colortable));
+   mgr.setOptionHandlerString("render-cdxml-properties-name-property", SETTER_GETTER_STR_OPTION(cdxmlContext.propertyNameCaption));
+   mgr.setOptionHandlerString("render-cdxml-properties-value-property", SETTER_GETTER_STR_OPTION(cdxmlContext.propertyValueCaption));
+   mgr.setOptionHandlerString("render-cdxml-properties-key-alignment", indigoRenderSetCdxmlPropertiesKeyAlignment, indigoRenderGetCdxmlPropertiesKeyAlignment);
+   mgr.setOptionHandlerFloat("render-cdxml-properties-size", SETTER_GETTER_FLOAT_OPTION(cdxmlContext.propertyFontSize));
+   mgr.setOptionHandlerString("render-cdxml-title-font", SETTER_GETTER_STR_OPTION(cdxmlContext.titleFont));
+   mgr.setOptionHandlerString("render-cdxml-title-face", SETTER_GETTER_STR_OPTION(cdxmlContext.titleFace));
 
    mgr.setOptionHandlerVoid("reset-render-options", indigoRenderResetOptions);
 }

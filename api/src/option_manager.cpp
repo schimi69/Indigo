@@ -11,6 +11,7 @@
  * This file is provided AS IS with NO WARRANTY OF ANY KIND, INCLUDING THE
  * WARRANTY OF DESIGN, MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE.
  ***************************************************************************/
+#include <string>
 
 #include "option_manager.h"
 #include "base_cpp/scanner.h"
@@ -33,12 +34,12 @@ void OptionManager::callOptionHandlerInt (const char* name, int value) {
 
    if (typeMap.at(name) == OPTION_BOOL && (value == 0 || value == 1))
    {
-      hMapBool.at(name)(value);
+      boolSetters.at(name)(value);
       return;
    }
 
    if (typeMap.at(name) == OPTION_INT)
-      hMapInt.at(name)(value);
+      intSetters.at(name)(value);
    else
       callOptionHandlerT(name, value);
 }
@@ -46,7 +47,7 @@ void OptionManager::callOptionHandlerInt (const char* name, int value) {
 void OptionManager::callOptionHandlerBool (const char* name, int value) {
    CHECK_OPT_DEFINED(name);
    if (typeMap.at(name) == OPTION_BOOL)
-      hMapBool.at(name)(value);
+      boolSetters.at(name)(value);
    else
       callOptionHandlerT(name, value);
 }
@@ -54,7 +55,7 @@ void OptionManager::callOptionHandlerBool (const char* name, int value) {
 void OptionManager::callOptionHandlerFloat (const char* name, float value) {
    CHECK_OPT_DEFINED(name);
    if (typeMap.at(name) == OPTION_FLOAT)
-      hMapFloat.at(name)(value);
+      floatSetters.at(name)(value);
    else
       callOptionHandlerT(name, value);
 }
@@ -62,19 +63,136 @@ void OptionManager::callOptionHandlerFloat (const char* name, float value) {
 void OptionManager::callOptionHandlerVoid (const char* name)
 {
    CHECK_OPT_DEFINED(name);
-   hMapVoid.at(name)();
+   voidFunctions.at(name)();
 }
 
 void OptionManager::callOptionHandlerColor (const char* name, float r, float g, float b) {
    CHECK_OPT_DEFINED(name);
    CHECK_OPT_TYPE(name, OPTION_COLOR);
-   hMapColor.at(name)(r, g, b);
+   colorSetters.at(name)(r, g, b);
 }
 
 void OptionManager::callOptionHandlerXY (const char* name, int x, int y) {
    CHECK_OPT_DEFINED(name);
    CHECK_OPT_TYPE(name, OPTION_XY);
-   hMapXY.at(name)(x, y);
+   xySetters.at(name)(x, y);
+}
+
+void OptionManager::getOptionValueInt (const char* name, int& value)
+{
+   CHECK_OPT_DEFINED(name);
+   CHECK_OPT_TYPE(name, OPTION_INT);
+   intGetters.at(name)(value);
+}
+
+void OptionManager::getOptionValueStr (const char* name, Array<char>& value)
+{
+    CHECK_OPT_DEFINED(name);
+    
+    switch(typeMap.at(name))
+    {
+        case OPTION_STRING: 
+        {
+            CHECK_OPT_TYPE(name, OPTION_STRING);
+            stringGetters.at(name)(value); 
+            break;
+        }
+        case OPTION_INT: 
+        {
+            int tmp;
+            getOptionValueInt(name, tmp);
+            auto strValue = std::to_string(tmp);
+            value.readString(strValue.c_str(), true); 
+            break;
+        }
+        case OPTION_BOOL:
+        {
+            int tmp;
+            getOptionValueBool(name, tmp);
+            std::string strValue = "false";
+            if (tmp == 1) strValue = "true";
+            value.readString(strValue.c_str(), true); 
+            break;
+        }
+        case OPTION_FLOAT: 
+        {
+            float tmp;
+            getOptionValueFloat(name, tmp);
+            auto strValue = std::to_string(tmp);
+            value.readString(strValue.c_str(), true); 
+            break;
+        }
+        case OPTION_COLOR: 
+        {
+            float r, g, b;
+            getOptionValueColor (name, r, g, b);
+            auto strValue = "["+std::to_string(r)+", "+std::to_string(g)+", "+std::to_string(b)+"]";
+            value.readString(strValue.c_str(), true); 
+            break;
+        }
+        case OPTION_XY: 
+        {
+            int x, y;
+            getOptionValueXY (name, x, y);
+            auto strValue = "["+std::to_string(x)+", "+std::to_string(y)+"]";
+            value.readString(strValue.c_str(), true); 
+            break;
+        }
+        default:
+            throw Error("Property type mismatch", name);
+            break;
+    }
+}
+
+void OptionManager::getOptionValueBool (const char* name, int& value)
+{
+    CHECK_OPT_DEFINED(name);
+    CHECK_OPT_TYPE(name, OPTION_BOOL);
+    boolGetters.at(name)(value);
+}
+
+void OptionManager::getOptionValueFloat (const char* name, float& value)
+{
+    CHECK_OPT_DEFINED(name);
+    CHECK_OPT_TYPE(name, OPTION_FLOAT);
+    floatGetters.at(name)(value);
+}
+
+void OptionManager::getOptionValueColor (const char* name, float& r, float& g, float& b)
+{
+    CHECK_OPT_DEFINED(name);
+    CHECK_OPT_TYPE(name, OPTION_COLOR);
+    colorGetters.at(name)(r, g, b);
+}
+
+void OptionManager::getOptionValueXY (const char* name, int& x, int& y)
+{
+    CHECK_OPT_DEFINED(name);
+    CHECK_OPT_TYPE(name, OPTION_XY);
+    xyGetters.at(name)(x, y);
+}
+
+void OptionManager::getOptionType(const char* name, Array<char>& value)
+{
+    CHECK_OPT_DEFINED(name);
+    if (!typeMap.find(name))
+      throw Error("Property \"%s\" not defined", name);
+ 
+    auto copyString = [](const char* source, char* dest, int len){
+      if(strlen(source) > len)
+        throw Error("invalid string value len: expected len: %d, actual len: %d", len, strlen(source));
+      memset (dest, ' ', len);
+      strcpy(dest, source);  
+    };
+    switch(typeMap.at(name))
+    {
+        case OPTION_STRING: value.readString("str", true); break;
+        case OPTION_INT: value.readString("int", true); break;
+        case OPTION_BOOL: value.readString("bool", true); break;
+        case OPTION_FLOAT: value.readString("float", true); break;
+        case OPTION_COLOR: value.readString("color", true); break;
+        case OPTION_XY: value.readString("xy", true); break;       
+    }
 }
 
 bool OptionManager::hasOptionHandler (const char* name) {
@@ -90,32 +208,32 @@ void OptionManager::callOptionHandler (const char* name, const char* value) {
    switch (type)
    {
    case OPTION_STRING:
-      hMapString.at(name)(value);
+      stringSetters.at(name)(value);
       break;
    case OPTION_INT:
       if (_parseInt(value, x) < 0)
          throw Error("Cannot recognize \"%s\" as an integer value", value);
-      hMapInt.at(name)(x);
+      intSetters.at(name)(x);
       break;
    case OPTION_BOOL:
       if (_parseBool(value, x) < 0)
          throw Error("Cannot recognize \"%s\" as a boolean value", value);
-      hMapBool.at(name)(x);
+      boolSetters.at(name)(x);
       break;
    case OPTION_FLOAT:
       if (_parseFloat(value, f) < 0)
          throw Error("Cannot recognize \"%s\" as a float value", value);
-      hMapFloat.at(name)(f);
+      floatSetters.at(name)(f);
       break;
    case OPTION_COLOR:
       if (_parseColor(value, r, g, b) < 0)
          throw Error("Cannot recognize \"%s\" as a color value", value);
-      hMapColor.at(name)(r, g, b);
+      colorSetters.at(name)(r, g, b);
       break;
    case OPTION_XY:
       if (_parseSize(value, x, y) < 0)
          throw Error("Cannot recognize \"%s\" as a pair of integers", value);
-      hMapXY.at(name)(x, y);
+      xySetters.at(name)(x, y);
       break;
    default:
       throw Error("Option type not supported");

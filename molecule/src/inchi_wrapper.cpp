@@ -68,7 +68,7 @@ private:
 
 const char* InchiWrapper::version()
 {
-	return INCHI_NAME " version " INCHI_VERSION TARGET_ID_STRING;
+	return APP_DESCRIPTION;
 }
 
 InchiWrapper::InchiWrapper()
@@ -100,6 +100,11 @@ void InchiWrapper::setOptions(const char *opt)
       if (options[i] == '/')
          options[i] = '-';
 #endif
+}
+
+void InchiWrapper::getOptions (Array<char>& value)
+{
+    options.copy(value);
 }
 
 static inchi_BondType getInchiBondType (int bond_order)
