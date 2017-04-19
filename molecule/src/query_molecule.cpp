@@ -1976,6 +1976,8 @@ QueryMolecule::Atom* QueryMolecule::stripKnownAttrs (QueryMolecule::Atom& qa) {
 int QueryMolecule::parseQueryAtom (QueryMolecule& qm, int aid, Array<int>& list) {
    QueryMolecule::Atom& qa = qm.getAtom(aid);
    QueryMolecule::Atom* qc = stripKnownAttrs(qa);
+   if (qa.type == QueryMolecule::OP_NONE)
+      return QUERY_ATOM_AH;
    if (qc != NULL && isNotAtom(*qc, ELEM_H))
       return QUERY_ATOM_A;
    bool notList = false;
@@ -1986,8 +1988,23 @@ int QueryMolecule::parseQueryAtom (QueryMolecule& qm, int aid, Array<int>& list)
       notList = notList || qa.type == QueryMolecule::OP_NOT;
       if (!notList && list.size() == 5 && list[0] == ELEM_F && list[1] == ELEM_Cl && list[2] == ELEM_Br && list[3] == ELEM_I && list[4] == ELEM_At)
          return QUERY_ATOM_X;
+      if (!notList && list.size() == 6 && list[0] == ELEM_F && list[1] == ELEM_Cl && list[2] == ELEM_Br && list[3] == ELEM_I && list[4] == ELEM_At && list[5] == ELEM_H)
+         return QUERY_ATOM_XH;
       if (notList && list.size() == 2 && ((list[0] == ELEM_C && list[1] == ELEM_H) || (list[0] == ELEM_H && list[1] == ELEM_C)))
          return QUERY_ATOM_Q;
+      if (notList && list.size() == 1 && (list[0] == ELEM_C))
+         return QUERY_ATOM_QH;
+      if (notList && list.size() == 17 && list[0] == ELEM_C && list[1] == ELEM_N && list[2] == ELEM_O && list[3] == ELEM_F &&
+                                          list[4] == ELEM_P && list[5] == ELEM_S && list[6] == ELEM_Cl && list[7] == ELEM_Se && list[8] == ELEM_Br &&
+                                          list[9] == ELEM_I && list[10] == ELEM_At && list[11] == ELEM_He && list[12] == ELEM_Ne && list[13] == ELEM_Ar &&
+                                          list[14] == ELEM_Kr && list[15] == ELEM_Xe && list[16] == ELEM_Rn)
+         return QUERY_ATOM_MH;
+      if (notList && list.size() == 18 && list[0] == ELEM_C && list[1] == ELEM_N && list[2] == ELEM_O && list[3] == ELEM_F &&
+                                          list[4] == ELEM_P && list[5] == ELEM_S && list[6] == ELEM_Cl && list[7] == ELEM_Se && list[8] == ELEM_Br &&
+                                          list[9] == ELEM_I && list[10] == ELEM_At && list[11] == ELEM_He && list[12] == ELEM_Ne && list[13] == ELEM_Ar &&
+                                          list[14] == ELEM_Kr && list[15] == ELEM_Xe && list[16] == ELEM_Rn && list[17] == ELEM_H)
+         return QUERY_ATOM_M;
+
       return notList ? QUERY_ATOM_NOTLIST : QUERY_ATOM_LIST;
    }
    return -1;
@@ -1997,6 +2014,23 @@ bool QueryMolecule::queryAtomIsRegular (QueryMolecule& qm, int aid) {
    QueryMolecule::Atom& qa = qm.getAtom(aid);
    QueryMolecule::Atom* qc = stripKnownAttrs(qa);
    return qc && qc->type == QueryMolecule::ATOM_NUMBER;
+}
+
+bool QueryMolecule::queryAtomIsSpecial (QueryMolecule& qm, int aid) {
+   QS_DEF(Array<int>, list);
+   int query_atom_type;
+
+   if ((query_atom_type = QueryMolecule::parseQueryAtom(qm, aid, list)) != -1)
+   {
+      if ( (query_atom_type == QueryMolecule::QUERY_ATOM_Q) || (query_atom_type == QueryMolecule::QUERY_ATOM_QH) ||
+           (query_atom_type == QueryMolecule::QUERY_ATOM_X) || (query_atom_type == QueryMolecule::QUERY_ATOM_XH) ||
+           (query_atom_type == QueryMolecule::QUERY_ATOM_M) || (query_atom_type == QueryMolecule::QUERY_ATOM_MH) ||
+           (query_atom_type == QueryMolecule::QUERY_ATOM_AH) ) 
+      {
+         return true;
+      } 
+   }
+   return false;
 }
 
 QueryMolecule::Bond* QueryMolecule::getBondOrderTerm (QueryMolecule::Bond& qb, bool& complex)

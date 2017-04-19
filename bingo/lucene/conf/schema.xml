@@ -26,7 +26,9 @@
     <fieldtype name="T_molId" class="solr.TextField" indexed="false" stored="true"/>
     <fieldtype name="T_serReact" class="solr.BinaryField" indexed="false" stored="true"/>
     <fieldtype name="T_reactId" class="solr.TextField" indexed="false" stored="true"/>
-    <fieldtype name="T_fingerprint" class="solr.TextField" multiValued="true" indexed="true" stored="true"/>
+    <fieldtype name="T_fingerprint" class="solr.TextField" multiValued="true" indexed="true" stored="true">
+        <similarity class="com.epam.indigolucene.solrext.ChemSimilarity"/>>
+    </fieldtype>
     <fieldtype name="T_molsim" class="solr.TextField" indexed="true" stored="true" />
     <fieldtype name="T_docUrl" class="solr.TextField" indexed="false" stored="true"/>
     <fieldtype name="T_docId" class="solr.TextField" indexed="true" stored="true"/>

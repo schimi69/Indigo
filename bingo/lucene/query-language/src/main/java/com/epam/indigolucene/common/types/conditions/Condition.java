@@ -2,7 +2,6 @@ package com.epam.indigolucene.common.types.conditions;
 
 import com.epam.indigolucene.common.types.conditions.logicalconditions.AndCondition;
 import com.epam.indigolucene.common.types.conditions.logicalconditions.OrCondition;
-import com.epam.indigolucene.common.types.conditions.molconditions.MolStructureCondition;
 import org.json.simple.JSONObject;
 
 import java.util.*;
@@ -40,7 +39,7 @@ public interface Condition<S> {
      * Get all conditions which should be considered on the post-filter stage (these are "expensive" parts of molecules matching)
      * @return
      */
-    default List<MolStructureCondition<S>> molStructureConditions() {
+    default List<ChemStructureCondition<S>> chemStructureConditions() {
         return new LinkedList<>();
     }
 

@@ -285,7 +285,9 @@ public:
 
    bool possibleNitrogenV5 (int idx);
 
-   enum QUERY_ATOM {QUERY_ATOM_A, QUERY_ATOM_X, QUERY_ATOM_Q, QUERY_ATOM_LIST, QUERY_ATOM_NOTLIST};
+   enum QUERY_ATOM {QUERY_ATOM_A, QUERY_ATOM_X, QUERY_ATOM_Q, QUERY_ATOM_M,
+                    QUERY_ATOM_AH, QUERY_ATOM_XH, QUERY_ATOM_QH, QUERY_ATOM_MH,
+                    QUERY_ATOM_LIST, QUERY_ATOM_NOTLIST};
    enum QUERY_BOND {QUERY_BOND_DOUBLE_OR_AROMATIC = 0, QUERY_BOND_SINGLE_OR_AROMATIC, QUERY_BOND_SINGLE_OR_DOUBLE, QUERY_BOND_ANY};
    static bool isKnownAttr (QueryMolecule::Atom& qa);
    static bool isNotAtom (QueryMolecule::Atom& qa, int elem);
@@ -293,6 +295,7 @@ public:
    static bool collectAtomList (Atom& qa, Array<int>& list, bool& notList);
    static int parseQueryAtom (QueryMolecule& qm, int aid, Array<int>& list);
    static bool queryAtomIsRegular (QueryMolecule& qm, int aid);
+   static bool queryAtomIsSpecial (QueryMolecule& qm, int aid);
    static Bond* getBondOrderTerm (Bond& qb, bool& complex);
    static bool isOrBond (Bond& qb, int type1, int type2);
    static bool isSingleOrDouble (Bond& qb);

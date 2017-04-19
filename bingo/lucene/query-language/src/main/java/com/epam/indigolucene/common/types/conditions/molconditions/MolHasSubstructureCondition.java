@@ -2,6 +2,7 @@ package com.epam.indigolucene.common.types.conditions.molconditions;
 
 import com.epam.indigo.IndigoObject;
 import com.epam.indigolucene.common.IndigoHolder;
+import com.epam.indigolucene.common.types.conditions.ChemStructureCondition;
 import com.epam.indigolucene.common.types.fields.MolField;
 import com.epam.indigolucene.common.utils.Utils;
 import com.epam.indigolucene.common.types.conditions.FieldCondition;
@@ -13,8 +14,8 @@ import java.util.List;
 /**
  * Created by Artem Malykh on 20.02.16.
  */
-public class MolHasSubstructureCondition<S> extends MolStructureCondition<S> {
-    public static final String OP_SUBSTRUCTURE = "subs";
+public class MolHasSubstructureCondition<S> extends ChemStructureCondition<S> {
+    public static final String OP_SUBSTRUCTURE = "molsubs";
     public static final String QMOL         = "qMolString";
 
     public static int SUBSTRUCTURE_REAL_MATCH_COST = 100;
@@ -93,8 +94,8 @@ public class MolHasSubstructureCondition<S> extends MolStructureCondition<S> {
     }
 
     @Override
-    public List<MolStructureCondition<S>> molStructureConditions() {
-        List<MolStructureCondition<S>> res = new LinkedList<>();
+    public List<ChemStructureCondition<S>> chemStructureConditions() {
+        List<ChemStructureCondition<S>> res = new LinkedList<>();
         res.add(this);
         return res;
     }

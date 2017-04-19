@@ -1,4 +1,4 @@
-package indexer;
+package indexer.moleculeTest;
 
 import com.epam.indigolucene.common.IndigoHolder;
 import com.epam.indigolucene.common.SolrUploadStream;
@@ -17,6 +17,7 @@ import java.util.Map;
 import static indexer.data.generated.TestSchema.CONTENT_TYPE;
 import static indexer.data.generated.TestSchema.MOL;
 
+
 /**
  * Created by Artem Malykh on 24.02.16.
  *
@@ -24,8 +25,8 @@ import static indexer.data.generated.TestSchema.MOL;
  * for quick checks working of plugin. This class should be redone.
  */
 //TODO: move to core package
-public class ConditionTest extends BaseTest {
-    private static final Logger logger = Logger.getLogger(ConditionTest.class);
+public class MoleculeConditionTest extends MoleculeBaseTest {
+    private static final Logger logger = Logger.getLogger(MoleculeConditionTest.class);
 
     private static final int BENZOL_SMALL_LIMIT = 2;
     private static final int BENZOL_BIG_LIMIT   = 2000;
@@ -35,7 +36,7 @@ public class ConditionTest extends BaseTest {
 
     //TODO: change for some real rare mol for test set.
     private static final String RARE_MOL = BENZOL;
-
+    private static final String RARE_REACTION = REACTION;
     @Test
     public void test1() throws Exception {
         long before = System.currentTimeMillis();
@@ -65,8 +66,10 @@ public class ConditionTest extends BaseTest {
         query.processWith(lst -> logger.info(lst.size()));
     }
 
+
+
     @Test
-    public void testTextSearch() throws Exception {
+    public void testMoleculeTextSearch() throws Exception {
         testCollection.removeAll();
 
         String[] variousTextValues = {"val1", "val2"};
@@ -86,21 +89,21 @@ public class ConditionTest extends BaseTest {
         }
         logger.info("done");
 
-
         List<Map<String, Object>> result = new LinkedList<>();
         testCollection.find().filter(CONTENT_TYPE.startsWith(variousTextValues[0])).
                               filter(MOL.unsafeHasSubstructure(RARE_MOL)).
                               processWith(lst -> result.addAll(lst));
-
-        logger.info(result + " : " + result.size());
-        Assert.assertTrue(result.size() == 1);
-
-        result.clear();
-        testCollection.find().filter(CONTENT_TYPE.startsWith(variousTextValues[0])).
-                              processWith(lst -> result.addAll(lst));
-
+        System.out.println("Result " + result);
         logger.info(result + " : " + result.size());
         Assert.assertTrue(result.size() == 2);
+        result.clear();
+
+
+        testCollection.find().filter(CONTENT_TYPE.startsWith(variousTextValues[0])).
+                              processWith(lst -> result.addAll(lst));
+        logger.info(result + " : " + result.size());
+        Assert.assertTrue(result.size() == 0);
+        result.clear();
     }
 
     protected void benchmarkMol(String mol, int limit) throws Exception {

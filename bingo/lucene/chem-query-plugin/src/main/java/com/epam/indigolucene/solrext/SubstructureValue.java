@@ -3,7 +3,6 @@ package com.epam.indigolucene.solrext;
 import com.epam.indigo.IndigoObject;
 import com.epam.indigolucene.common.IndigoHolder;
 import org.apache.lucene.document.Document;
-import org.apache.lucene.index.DocValues;
 import org.apache.lucene.index.LeafReader;
 import org.apache.lucene.index.LeafReaderContext;
 import org.apache.lucene.queries.function.FunctionValues;
@@ -15,12 +14,12 @@ import java.util.Map;
 /**
  * Created by Artem Malykh on 01.03.16.
  */
-public class SubstrucureValue extends ValueSource {
-    private final IndigoObject qMol;
+public class SubstructureValue extends ValueSource {
+    private final IndigoObject qChem;
     private String fieldName;
 
-    public SubstrucureValue(IndigoObject qMol, String fieldName) {
-        this.qMol = qMol;
+    public SubstructureValue(IndigoObject qChem, String fieldName) {
+        this.qChem = qChem;
         this.fieldName = fieldName;
     }
 
@@ -36,8 +35,8 @@ public class SubstrucureValue extends ValueSource {
                 } catch (IOException e) {
                     e.printStackTrace();
                 }
-                IndigoObject mol = getMol(fieldName, curDoc);
-                if (IndigoHolder.getIndigo().substructureMatcher(mol).match(qMol) != null) {
+                IndigoObject chem = getChem(fieldName, curDoc);
+                if (IndigoHolder.getIndigo().substructureMatcher(chem).match(qChem) != null) {
                     return 1.0f;
                 } else {
                     return 0.0f;
@@ -58,7 +57,7 @@ public class SubstrucureValue extends ValueSource {
         };
     }
 
-    private IndigoObject getMol(String fieldName, Document doc) {
+    private IndigoObject getChem(String fieldName, Document doc) {
         return IndigoHolder.getIndigo().unserialize(doc.getBinaryValue(fieldName).bytes);
     }
 
@@ -68,16 +67,16 @@ public class SubstrucureValue extends ValueSource {
         if (this == o) return true;
         if (o == null || getClass() != o.getClass()) return false;
 
-        SubstrucureValue that = (SubstrucureValue) o;
+        SubstructureValue that = (SubstructureValue) o;
 
-        if (qMol != null ? !qMol.equals(that.qMol) : that.qMol != null) return false;
+        if (qChem != null ? !qChem.equals(that.qChem) : that.qChem != null) return false;
         return fieldName != null ? fieldName.equals(that.fieldName) : that.fieldName == null;
 
     }
 
     @Override
     public int hashCode() {
-        int result = qMol != null ? qMol.hashCode() : 0;
+        int result = qChem != null ? qChem.hashCode() : 0;
         result = 31 * result + (fieldName != null ? fieldName.hashCode() : 0);
         return result;
     }

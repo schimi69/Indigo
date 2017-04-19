@@ -1,11 +1,11 @@
-package com.epam.indigolucene.common.types.conditions.molconditions;
+package com.epam.indigolucene.common.types.conditions.reactconditions;
 
 import com.epam.indigo.IndigoObject;
 import com.epam.indigolucene.common.IndigoHolder;
 import com.epam.indigolucene.common.types.conditions.ChemStructureCondition;
 import com.epam.indigolucene.common.types.conditions.Condition;
 import com.epam.indigolucene.common.types.conditions.FieldCondition;
-import com.epam.indigolucene.common.types.fields.MolField;
+import com.epam.indigolucene.common.types.fields.ReactField;
 import com.epam.indigolucene.common.utils.Utils;
 import org.json.simple.JSONObject;
 
@@ -13,31 +13,31 @@ import java.util.LinkedList;
 import java.util.List;
 
 /**
- * Created by Artem Malykh on 03.03.16.
+ * Created by Filipp Pisarev on 07/04/2017.
  */
-public class MolMatchesExactlyCondition<S> extends ChemStructureCondition<S> {
-    public static final String OP_EXACT = "molexact";
-    public static final String QMOL         = "qMolString";
+public class ReactMatchesExactlyCondition<S> extends ChemStructureCondition<S>{
+    public static final String OP_EXACT = "reactexact";
+    public static final String QREACT = "qReactString";
     public static float SUBSTRUCTURE_MATCHES = 1.0f;
 
     public static int SUBSTRUCTURE_REAL_MATCH_COST = 100;
     public static int SUBSTRUCTURE_FP_MATCH_COST   = 1;
 
-    private String qMolString;
-    private IndigoObject qMol;
+    private String qReactString;
+    private IndigoObject qReact;
 
-    public MolMatchesExactlyCondition(MolField<S> field, String qMolString) {
+    public ReactMatchesExactlyCondition(ReactField<S> field, String qReactString) {
         super(field);
-        this.qMolString = qMolString;
-        qMol = IndigoHolder.getIndigo().loadMolecule(qMolString);
-        qMol.aromatize();
+        this.qReactString = qReactString;
+        qReact = IndigoHolder.getIndigo().loadReaction(qReactString);
+        qReact.aromatize();
     }
 
-    public MolMatchesExactlyCondition(MolField<S> field, IndigoObject qMol) {
+    public ReactMatchesExactlyCondition(ReactField<S> field, IndigoObject qReact) {
         super(field);
-        this.qMol = qMol.clone();
-        this.qMol.aromatize();
-        qMolString = this.qMol.cml();
+        this.qReact = qReact.clone();
+        this.qReact.aromatize();
+        qReactString = this.qReact.cml();
     }
 
     @Override
@@ -45,19 +45,18 @@ public class MolMatchesExactlyCondition<S> extends ChemStructureCondition<S> {
         return OP_EXACT;
     }
 
-    public static <S> MolMatchesExactlyCondition<S> molMatchesExactlyFromJson(JSONObject json) {
-        String qmol =      (String) json.get(QMOL);
+    public static <S> ReactMatchesExactlyCondition reactMatchesExactlyFromJson(JSONObject json) {
+        String qreact =      (String) json.get(QREACT);
         String fieldName = (String) json.get(FieldCondition.FIELD_NAME);
         Boolean not = (Boolean) json.get(FieldCondition.NOT);
-        //TODO: make true serialization/deserialization for fields!!
-        MolMatchesExactlyCondition<S> res = new MolMatchesExactlyCondition<>(new MolField<>(fieldName, false), qmol);
+        ReactMatchesExactlyCondition<S> res = new ReactMatchesExactlyCondition<>(new ReactField<>(fieldName, false), qreact);
         res.not = not;
         return res;
     }
 
     @Override
     protected void addFieldConditionDataToJson(JSONObject obj) {
-        obj.put(QMOL, qMolString);
+        obj.put(QREACT, qReactString);
     }
 
     @Override
@@ -72,7 +71,7 @@ public class MolMatchesExactlyCondition<S> extends ChemStructureCondition<S> {
                     .append("cost=")
                     .append(SUBSTRUCTURE_FP_MATCH_COST)
                     .append("}")
-                    .append(Utils.produceSolrSubsFingerprintQuery(qMol, getField().getFingerprintFieldName()));
+                    .append(Utils.produceSolrSubsFingerprintQuery(qReact, getField().getFingerPrintFieldName()));
             res.add(sb.toString());
         }
 
@@ -81,9 +80,9 @@ public class MolMatchesExactlyCondition<S> extends ChemStructureCondition<S> {
     }
 
     @Override
-    public MolField<S> getField() {
+    public ReactField<S> getField() {
         //noinspection unchecked
-        return (MolField<S>) super.getField();
+        return (ReactField<S>) super.getField();
     }
 
     @Override
@@ -95,13 +94,13 @@ public class MolMatchesExactlyCondition<S> extends ChemStructureCondition<S> {
 
     @Override
     public Condition<S> not() {
-        MolMatchesExactlyCondition<S> res = new MolMatchesExactlyCondition<>(getField(), qMolString);
+        ReactMatchesExactlyCondition<S> res = new ReactMatchesExactlyCondition<>(getField(), qReactString);
         res.not = !this.not;
         return res;
     }
 
     @Override
     public boolean doMatch(IndigoObject obj) {
-        return IndigoHolder.getIndigo().exactMatch(qMol, obj) != null;
+        return IndigoHolder.getIndigo().exactMatch(qReact, obj) != null;
     }
 }
