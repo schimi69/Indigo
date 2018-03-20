@@ -16,6 +16,8 @@ package com.epam.indigo;
 
 import com.sun.jna.Native;
 import com.sun.jna.Pointer;
+import com.sun.jna.ptr.FloatByReference;
+import com.sun.jna.ptr.IntByReference;
 
 import java.io.*;
 import java.security.MessageDigest;
@@ -435,6 +437,42 @@ public class Indigo {
         setSessionID();
         checkResult(this, _lib.indigoSetOptionFloat(option, (float) value));
     }
+    
+    public String getOption(String option) {
+       setSessionID();
+       return Indigo.checkResultString(this, _lib.indigoGetOption(option));
+    }
+    
+    public Integer getOptionInt(String option) {
+      setSessionID();
+      IntByReference res = new IntByReference();
+      if (Indigo.checkResult(this, _lib.indigoGetOptionInt(option, res)) == 1) {
+         return res.getValue();
+      }
+      return null;
+    }
+    
+    public boolean getOptionBool(String option) {
+      setSessionID();
+      IntByReference res = new IntByReference();
+      Indigo.checkResult(this, _lib.indigoGetOptionBool(option, res));
+      return res.getValue() > 0;
+    }
+    
+    public Float getOptionFloat(String option) {
+      setSessionID();
+      FloatByReference res = new FloatByReference();
+      if (Indigo.checkResult(this, _lib.indigoGetOptionFloat(option, res)) == 1) {
+         return res.getValue();
+      }
+      return null;
+    }
+    
+    public String getOptionType(String option) {
+       setSessionID();
+       return Indigo.checkResultString(this, _lib.indigoGetOptionType(option));
+    }
+    
 
     public void resetOptions() {
         setSessionID();
@@ -554,6 +592,53 @@ public class Indigo {
     public IndigoObject loadReactionSmartsFromFile(String path) {
         setSessionID();
         return new IndigoObject(this, checkResult(this, _lib.indigoLoadReactionSmartsFromFile(path)));
+    }
+
+    public IndigoObject loadStructure(String str) {
+        return loadStructure(str, "");
+    }
+
+    public IndigoObject loadStructure(String str, String params) {
+        setSessionID();
+        return new IndigoObject(this, checkResult(this, _lib.indigoLoadStructureFromString(str, params)));
+    }
+
+    public IndigoObject loadStructure(byte[] buf) {
+        return loadStructure(buf, "");
+    }
+
+    public IndigoObject loadStructure(byte[] buf, String params) {
+        setSessionID();
+        return new IndigoObject(this, checkResult(this, _lib.indigoLoadStructureFromBuffer(buf, buf.length, params)));
+    }
+
+    public IndigoObject loadStructureFromFile(String path) {
+        return loadStructureFromFile(path, "");
+    }
+
+    public IndigoObject loadStructureFromFile(String path, String params) {
+        setSessionID();
+        return new IndigoObject(this, checkResult(this, _lib.indigoLoadStructureFromFile(path, params)));
+    }
+
+    public IndigoObject loadStructureFromBuffer(byte[] buf) {
+        return loadStructureFromBuffer(buf, "");
+    }
+
+    public IndigoObject loadStructureFromBuffer(byte[] buf, String params) {
+        setSessionID();
+        return new IndigoObject(this, checkResult(this, _lib.indigoLoadStructureFromBuffer(buf, buf.length, params)));
+    }
+
+    public IndigoObject loadFingerprintFromBuffer (byte[] buf) {
+        setSessionID();
+        return new IndigoObject(this, checkResult(this, _lib.indigoLoadFingerprintFromBuffer(buf, buf.length)));
+    }
+
+    public IndigoObject loadFingerprintFromDescriptors(double[] descriptors, int size, double density) {
+        setSessionID();
+        int result = _lib.indigoLoadFingerprintFromDescriptors(descriptors, descriptors.length, size, density);
+        return new IndigoObject(this, checkResult(this, result));
     }
 
     public IndigoObject createReaction() {

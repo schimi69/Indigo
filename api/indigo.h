@@ -16,7 +16,7 @@
 #define __indigo__
 
 #if defined(_WIN32)  && !defined(__MINGW32__)
-#define qword unsigned _int64
+#define qword unsigned __int64
 #else
 #define qword unsigned long long
 #endif
@@ -167,6 +167,10 @@ CEXPORT int indigoRemove (int item);
 
 CEXPORT int indigoCreateMolecule (void);
 CEXPORT int indigoCreateQueryMolecule (void);
+
+CEXPORT int indigoLoadStructureFromString (const char *string, const char * params);
+CEXPORT int indigoLoadStructureFromBuffer (const byte *string, int bufferSize, const char * params);
+CEXPORT int indigoLoadStructureFromFile (const char *filename, const char * params);
 
 CEXPORT int indigoLoadMolecule  (int source);
 CEXPORT int indigoLoadMoleculeFromString (const char *string);
@@ -648,6 +652,9 @@ CEXPORT const int * indigoSymmetryClasses (int molecule, int *count_out);
 CEXPORT int indigoHasCoord (int molecule);
 CEXPORT int indigoHasZCoord (int molecule);
 CEXPORT int indigoIsChiral (int molecule);
+CEXPORT int indigoCheckChirality (int molecule);
+CEXPORT int indigoCheck3DStereo (int molecule);
+CEXPORT int indigoCheckStereo (int molecule);
 
 CEXPORT int indigoIsPossibleFischerProjection (int molecule, const char *options);
 
@@ -766,6 +773,12 @@ CEXPORT int indigoCommonBits (int fingerprint1, int fingerprint2);
 
 //Return one bits string for the fingerprint object
 CEXPORT const char* indigoOneBitsList (int fingerprint);
+
+// Returns a 'fingerprint' object with data from 'buffer'
+CEXPORT int indigoLoadFingerprintFromBuffer(const byte *buffer, int size);
+
+// Constructs a 'fingerprint' object from a normalized array of double descriptors
+CEXPORT int indigoLoadFingerprintFromDescriptors(const double *arr, int arr_len, int size, double density);
 
 // Accepts two molecules, two reactions, or two fingerprints.
 // Returns the similarity measure between them.

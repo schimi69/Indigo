@@ -271,7 +271,7 @@ void MolfileSaver::_writeCtabHeader2000 (Output &output, BaseMolecule &mol)
 {
    int chiral = 0;
 
-   if (!no_chiral && mol.isChrial())
+   if (!no_chiral && mol.isChiral())
       chiral = 1;
 
    output.printfCR("%3d%3d%3d%3d%3d%3d%3d%3d%3d%3d%3d V2000",
@@ -1083,6 +1083,8 @@ void MolfileSaver::_writeTGroup (Output &output, BaseMolecule &mol, int tg_idx)
       out.printf("%s", tgroup.tgroup_name.ptr());
    if (tgroup.tgroup_alias.size() > 0)
       out.printf("/%s", tgroup.tgroup_alias.ptr());
+   if (tgroup.tgroup_natreplace.size() > 0)
+      out.printf(" NATREPLACE=%s", tgroup.tgroup_natreplace.ptr());
    if (tgroup.tgroup_comment.size() > 0)
       out.printf(" COMMENT=%s", tgroup.tgroup_comment.ptr());
 
@@ -2304,9 +2306,10 @@ void MolfileSaver::_addCIPSgroups (BaseMolecule &mol, Array<int> &atom_cip_desc,
             sgroup.data.readString("(s)", true);
 
          sgroup.name.readString("INDIGO_CIP_DESC", true);
-         sgroup.display_pos.x = mol.getAtomXyz(i).x;
-         sgroup.display_pos.y = mol.getAtomXyz(i).y;
+         sgroup.display_pos.x = 0.0;
+         sgroup.display_pos.y = 0.0;
          sgroup.detached = true;
+         sgroup.relative = true;
       }
    }
 
@@ -2328,9 +2331,10 @@ void MolfileSaver::_addCIPSgroups (BaseMolecule &mol, Array<int> &atom_cip_desc,
             sgroup.data.readString("(Z)", true);
 
          sgroup.name.readString("INDIGO_CIP_DESC", true);
-         sgroup.display_pos.x = (mol.getAtomXyz(beg).x + mol.getAtomXyz(end).x) / 2;
-         sgroup.display_pos.y = (mol.getAtomXyz(beg).y + mol.getAtomXyz(end).y) / 2;
+         sgroup.display_pos.x = 0.0;
+         sgroup.display_pos.y = 0.0;
          sgroup.detached = true;
+         sgroup.relative = true;
       }
    }
 }

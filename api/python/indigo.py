@@ -445,6 +445,36 @@ class IndigoObject(object):
         self.dispatcher._setSessionId()
         return self.dispatcher._checkResult(Indigo._lib.indigoCheckRGroups(self.id))
 
+    def checkChirality(self):
+
+        """
+        ::
+
+            Since version 1.3.0
+        """
+        self.dispatcher._setSessionId()
+        return self.dispatcher._checkResult(Indigo._lib.indigoCheckChirality(self.id))
+
+    def check3DStereo(self):
+
+        """
+        ::
+
+            Since version 1.3.0
+        """
+        self.dispatcher._setSessionId()
+        return self.dispatcher._checkResult(Indigo._lib.indigoCheck3DStereo(self.id))
+
+    def checkStereo(self):
+
+        """
+        ::
+
+            Since version 1.3.0
+        """
+        self.dispatcher._setSessionId()
+        return self.dispatcher._checkResult(Indigo._lib.indigoCheckStereo(self.id))
+
     def countHydrogens(self):
         value = c_int()
         self.dispatcher._setSessionId()
@@ -1560,6 +1590,12 @@ class Indigo(object):
         Indigo._lib.indigoLoadReactionSmartsFromString.argtypes = [c_char_p]
         Indigo._lib.indigoLoadReactionSmartsFromFile.restype = c_int
         Indigo._lib.indigoLoadReactionSmartsFromFile.argtypes = [c_char_p]
+        Indigo._lib.indigoLoadStructureFromString.restype = c_int
+        Indigo._lib.indigoLoadStructureFromString.argtypes = [c_char_p, c_char_p]
+        Indigo._lib.indigoLoadStructureFromBuffer.restype = c_int
+        Indigo._lib.indigoLoadStructureFromBuffer.argtypes = [POINTER(c_byte), c_int, c_char_p]
+        Indigo._lib.indigoLoadStructureFromFile.restype = c_int
+        Indigo._lib.indigoLoadStructureFromFile.argtypes = [c_char_p, c_char_p]
         Indigo._lib.indigoCreateReaction.restype = c_int
         Indigo._lib.indigoCreateReaction.argtypes = None
         Indigo._lib.indigoCreateQueryReaction.restype = c_int
@@ -2112,8 +2148,18 @@ class Indigo(object):
         Indigo._lib.indigoCheckBadValence.argtypes = [c_int]
         Indigo._lib.indigoCheckAmbiguousH.restype = c_char_p
         Indigo._lib.indigoCheckAmbiguousH.argtypes = [c_int]
+        Indigo._lib.indigoCheckChirality.restype = c_int
+        Indigo._lib.indigoCheckChirality.argtypes = [c_int]
+        Indigo._lib.indigoCheck3DStereo.restype = c_int
+        Indigo._lib.indigoCheck3DStereo.argtypes = [c_int]
+        Indigo._lib.indigoCheckStereo.restype = c_int
+        Indigo._lib.indigoCheckStereo.argtypes = [c_int]
         Indigo._lib.indigoFingerprint.restype = c_int
         Indigo._lib.indigoFingerprint.argtypes = [c_int, c_char_p]
+        Indigo._lib.indigoLoadFingerprintFromBuffer.restype = c_int
+        Indigo._lib.indigoLoadFingerprintFromBuffer.argtypes = [POINTER(c_byte), c_int]
+        Indigo._lib.indigoLoadFingerprintFromDescriptors.restype = c_int
+        Indigo._lib.indigoLoadFingerprintFromDescriptors.argtypes = [POINTER(c_double), c_int, c_int, c_double]
         Indigo._lib.indigoCountBits.restype = c_int
         Indigo._lib.indigoCountBits.argtypes = [c_int]
         Indigo._lib.indigoRawData.restype = c_char_p
@@ -2259,21 +2305,9 @@ class Indigo(object):
         self._checkResult(Indigo._lib.indigoGetOptionFloat(option.encode(ENCODE_ENCODING), pointer(value)))
         return value.value
 
-    def getOptionColor(self, option):
+    def getOptionType(self, option):
         self._setSessionId()
-        r = c_float()
-        g = c_float()
-        b = c_float()
-        self._checkResult(Indigo._lib.indigoGetOptionColor(option.encode(ENCODE_ENCODING), pointer(r), pointer(g), pointer(b)))
-        return (r.value, g.value, b.value)
-
-    def getOptionXY(self, option):
-        self._setSessionId()
-        x = c_int()
-        y = c_int()
-        self._checkResult(Indigo._lib.indigoGetOptionXY(option.encode(ENCODE_ENCODING), pointer(x), pointer(y)))
-        return (x.value, y.value)
-        
+        return self._checkResultString(Indigo._lib.indigoGetOptionType(option.encode(ENCODE_ENCODING))) 
 
     def resetOptions(self):
         self._setSessionId()
@@ -2413,6 +2447,66 @@ class Indigo(object):
     def loadReactionSmartsFromFile(self, filename):
         self._setSessionId()
         return self.IndigoObject(self, self._checkResult(Indigo._lib.indigoLoadReactionSmartsFromFile(filename.encode(ENCODE_ENCODING))))
+
+    def loadStructure(self, structureStr, parameter = None):
+        self._setSessionId()
+        parameter = '' if parameter is None else parameter 
+        return self.IndigoObject(self, 
+                                 self._checkResult(Indigo._lib.indigoLoadStructureFromString(structureStr.encode(ENCODE_ENCODING),
+                                                                                             parameter)))
+        
+    def loadStructureFromBuffer(self, structureData, parameter = None):
+        if sys.version_info[0] < 3:
+            buf = map(ord, structureData)
+        else:
+            buf = structureData
+        values = (c_byte * len(buf))()
+        for i in range(len(buf)):
+            values[i] = buf[i]
+        self._setSessionId()
+        return self.IndigoObject(self, self._checkResult(Indigo._lib.indigoLoadStructureFromBuffer(values, len(buf), parameter)))
+    
+    def loadStructureFromFile(self, filename, parameter = None):
+        self._setSessionId()
+        return self.IndigoObject(self, self._checkResult(Indigo._lib.indigoLoadStructureFromFile(filename.encode(ENCODE_ENCODING), 
+                                                                                                 parameter)))
+
+    def loadFingerprintFromBuffer(self, buffer):
+        """ Creates a fingerprint from the supplied binary data
+
+        :param buffer:  a list of bytes
+        :return:        a fingerprint object
+
+        Since version 1.3.0
+        """
+        self._setSessionId()
+        length = len(buffer)
+
+        values = (c_byte * length)()
+        for i in range(length):
+            values[i] = buffer[i]
+
+        return self.IndigoObject(self, self._checkResult(Indigo._lib.indigoLoadFingerprintFromBuffer(values, length)))
+
+    def loadFingerprintFromDescriptors(self, descriptors, size, density):
+        """ Packs a list of molecule descriptors into a fingerprint object
+
+        :param descriptors:  list of normalized numbers (roughly) between 0.0 and 1.0
+        :param size:         size of the fingerprint in bytes
+        :param density:      approximate density of '1's vs `0`s in the fingerprint
+        :return:             a fingerprint object
+
+        Since version 1.3.0
+        """
+        self._setSessionId()
+        length = len(descriptors)
+
+        descr_arr = (c_double * length)()
+        for i in range(length):
+            descr_arr[i] = descriptors[i]
+
+        result = Indigo._lib.indigoLoadFingerprintFromDescriptors(descr_arr, length, size, density)
+        return self.IndigoObject(self, self._checkResult(result))
 
     def createReaction(self):
         self._setSessionId()

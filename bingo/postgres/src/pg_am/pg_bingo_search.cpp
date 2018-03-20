@@ -19,6 +19,10 @@ extern "C" {
 #include "bingo_pg_common.h"
 #include "base_cpp/tlscont.h"
 
+
+
+#if PG_VERSION_NUM / 100 < 906
+
 extern "C" {
 BINGO_FUNCTION_EXPORT(bingo_beginscan);
 
@@ -32,6 +36,7 @@ BINGO_FUNCTION_EXPORT(bingo_rescan);
 
 BINGO_FUNCTION_EXPORT(bingo_endscan);
 }
+#endif
 
 //#include <signal.h>
 //__sighandler_t old_handler = 0;
@@ -46,17 +51,24 @@ BINGO_FUNCTION_EXPORT(bingo_endscan);
 /*
  * Bingo searching initialization
  */
+
+#if PG_VERSION_NUM / 100 >= 906
+CEXPORT IndexScanDesc bingo_beginscan (Relation rel,
+                              int keysz,
+                              int norderbys) {
+
+#else
 Datum
 bingo_beginscan(PG_FUNCTION_ARGS) {
    Relation rel = (Relation) PG_GETARG_POINTER(0);
    int keysz = PG_GETARG_INT32(1);
-
 #if PG_VERSION_NUM / 100 == 900
 	ScanKey norderbys = (ScanKey) PG_GETARG_POINTER(2);
 #elif PG_VERSION_NUM / 100 >= 901 
    int norderbys = PG_GETARG_INT32(2);
 #else
    elog(ERROR, "unsupported version %s", PG_VERSION)
+#endif
 #endif
 
    IndexScanDesc scan = RelationGetIndexScan(rel, keysz, norderbys);
@@ -85,16 +97,29 @@ bingo_beginscan(PG_FUNCTION_ARGS) {
    }
    PG_BINGO_HANDLE(delete so; scan->opaque=NULL);
 
+   
+#if PG_VERSION_NUM / 100 >= 906
+   return scan;
+#else
    PG_RETURN_POINTER(scan);
+#endif
 }
 
 /*
  * Rescan an index relation
  */
+#if PG_VERSION_NUM / 100 >= 906
+CEXPORT void bingo_rescan (IndexScanDesc scan,
+          ScanKey scankey,
+          int nkeys,
+          ScanKey orderbys,
+          int norderbys) {
+#else
 Datum
 bingo_rescan(PG_FUNCTION_ARGS) {
    IndexScanDesc scan = (IndexScanDesc) PG_GETARG_POINTER(0);
    ScanKey scankey = (ScanKey) PG_GETARG_POINTER(1);
+#endif
 
    BingoPgSearch* so = 0;
    PG_BINGO_BEGIN
@@ -113,16 +138,22 @@ bingo_rescan(PG_FUNCTION_ARGS) {
 
    }
    PG_BINGO_HANDLE(delete so; scan->opaque=NULL);
-
+   
+#if PG_VERSION_NUM / 100 < 906
    PG_RETURN_VOID();
+#endif
 }
-
 /*
  * Close down a scan
  */
+
+#if PG_VERSION_NUM / 100 >= 906
+CEXPORT void bingo_endscan (IndexScanDesc scan) {
+#else
 Datum
 bingo_endscan(PG_FUNCTION_ARGS) {
    IndexScanDesc scan = (IndexScanDesc) PG_GETARG_POINTER(0);
+#endif
    elog(DEBUG1, "bingo: search: finish searching");
    
    PG_BINGO_BEGIN
@@ -138,9 +169,11 @@ bingo_endscan(PG_FUNCTION_ARGS) {
    }
    PG_BINGO_END
 
+#if PG_VERSION_NUM / 100 < 906
    PG_RETURN_VOID();
+#endif
+
 }
-using namespace indigo;
 /*
  * Get all tuples at once
  */
@@ -180,10 +213,16 @@ using namespace indigo;
 /*
  * Get a tuples by a chain
  */
+#if PG_VERSION_NUM / 100 >= 906
+CEXPORT bool bingo_gettuple (IndexScanDesc scan,
+            ScanDirection dir) {
+#else
 Datum
 bingo_gettuple(PG_FUNCTION_ARGS) {
    IndexScanDesc scan = (IndexScanDesc) PG_GETARG_POINTER(0);
    ScanDirection dir = (ScanDirection) PG_GETARG_INT32(1);
+#endif
+
    bool result = false;
 
    BingoPgSearch* search_engine = (BingoPgSearch*) scan->opaque;
@@ -203,5 +242,9 @@ bingo_gettuple(PG_FUNCTION_ARGS) {
    /*
     * If true then searching was successfull
     */
+#if PG_VERSION_NUM / 100 >= 906
+   return result;
+#else
    PG_RETURN_BOOL(result);
+#endif
 }

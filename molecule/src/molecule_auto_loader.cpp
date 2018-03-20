@@ -39,6 +39,8 @@ void MoleculeAutoLoader::_init ()
    ignore_noncritical_query_features = false;
    skip_3d_chirality = false;
    ignore_cistrans_errors = false;
+   ignore_no_chiral_flag = false;
+   ignore_bad_valence = false;
 }
 
 IMPL_ERROR(MoleculeAutoLoader, "molecule auto loader");
@@ -75,6 +77,7 @@ MoleculeAutoLoader::~MoleculeAutoLoader ()
 void MoleculeAutoLoader::loadMolecule (Molecule &mol)
 {
    _loadMolecule(mol, false);
+   mol.setIgnoreBadValenceFlag(ignore_bad_valence);
 }
 
 void MoleculeAutoLoader::loadQueryMolecule (QueryMolecule &qmol)
@@ -153,6 +156,31 @@ bool MoleculeAutoLoader::tryMDLCT (Scanner &scanner, Array<char> &outbuf)
    return endmark;
 }
 
+void MoleculeAutoLoader::readAllDataToString(Scanner & scanner, Array<char> & dataBuf)
+{
+    // check GZip format
+    if (scanner.length() >= 2)
+    {
+       byte id[2];
+       long long pos = scanner.tell();
+
+       scanner.readCharsFix(2, (char *)id);
+       scanner.seek(pos, SEEK_SET);
+
+       if (id[0] == 0x1f && id[1] == 0x8b)
+       {
+          GZipScanner gzscanner(scanner);
+          gzscanner.readAll(dataBuf);
+          dataBuf.push('\0');
+
+          return;
+       }
+    }
+
+    scanner.readAll(dataBuf);
+    dataBuf.push('\0');
+}
+
 void MoleculeAutoLoader::_loadMolecule (BaseMolecule &mol, bool query)
 {
    properties.clear();
@@ -178,6 +206,7 @@ void MoleculeAutoLoader::_loadMolecule (BaseMolecule &mol, bool query)
          loader2.ignore_noncritical_query_features = ignore_noncritical_query_features;
          loader2.treat_x_as_pseudoatom = treat_x_as_pseudoatom;
          loader2.skip_3d_chirality = skip_3d_chirality;
+         loader2.ignore_no_chiral_flag = ignore_no_chiral_flag;
          loader2.loadMolecule((Molecule &)mol);
          return;
       }
@@ -194,6 +223,7 @@ void MoleculeAutoLoader::_loadMolecule (BaseMolecule &mol, bool query)
          loader.ignore_noncritical_query_features = ignore_noncritical_query_features;
          loader.skip_3d_chirality = skip_3d_chirality;
          loader.treat_x_as_pseudoatom = treat_x_as_pseudoatom;
+         loader.ignore_no_chiral_flag = ignore_no_chiral_flag;
 
          if (query)
             loader.loadQueryMolecule((QueryMolecule &)mol);
@@ -312,7 +342,7 @@ void MoleculeAutoLoader::_loadMolecule (BaseMolecule &mol, bool query)
       }
 
       if (err_buf.size() > 0) {
-         throw Exception(err_buf.ptr());
+         throw Error(err_buf.ptr());
       }
    }
 
@@ -348,6 +378,7 @@ void MoleculeAutoLoader::_loadMolecule (BaseMolecule &mol, bool query)
       loader.ignore_noncritical_query_features = ignore_noncritical_query_features;
       loader.skip_3d_chirality = skip_3d_chirality;
       loader.treat_x_as_pseudoatom = treat_x_as_pseudoatom;
+      loader.ignore_no_chiral_flag = ignore_no_chiral_flag;
 
       if (query)
          loader.loadQueryMolecule((QueryMolecule &)mol);

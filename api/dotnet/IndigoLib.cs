@@ -22,6 +22,13 @@ namespace com.epam.indigo
         int indigoSetOptionFloat(string name, float value);
         int indigoSetOptionColor(string name, float r, float g, float b);
         int indigoSetOptionXY(string name, int x, int y);
+
+        sbyte* indigoGetOption(string name);
+        int indigoGetOptionInt(string name, int* value);
+        int indigoGetOptionBool(string name, int* value);
+        int indigoGetOptionFloat(string name, float* value);
+        sbyte* indigoGetOptionType(string name);
+
         int indigoResetOptions();
 
         int indigoReadFile(string filename);
@@ -45,6 +52,9 @@ namespace com.epam.indigo
         int indigoLoadSmartsFromString(string str);
         int indigoLoadSmartsFromFile(string filename);
         int indigoLoadSmartsFromBuffer(byte[] buffer, int size);
+        int indigoLoadStructureFromString(string str, string options);
+        int indigoLoadStructureFromFile(string path, string options);
+        int indigoLoadStructureFromBuffer(byte[] buf, int bufsize, string options);
         int indigoSaveMolfile(int molecule, int output);
         int indigoSaveMolfileToFile(int molecule, string filename);
         sbyte* indigoMolfile(int molecule);
@@ -339,8 +349,13 @@ namespace com.epam.indigo
         int indigoClearProperties(int handle);
         sbyte* indigoCheckBadValence(int handle);
         sbyte* indigoCheckAmbiguousH(int handle);
+        int indigoCheckChirality(int handle);
+        int indigoCheck3DStereo(int handle);
+        int indigoCheckStereo(int handle);
 
         int indigoFingerprint(int item, string type);
+        int indigoLoadFingerprintFromBuffer(byte[] buffer, int size);
+        int indigoLoadFingerprintFromDescriptors(double[] arr, int arr_len, int size, double density);
         int indigoCountBits(int fingerprint);
         int indigoCommonBits(int fingerprint1, int fingerprint2);
         float indigoSimilarity(int molecule1, int molecule2, string metrics);

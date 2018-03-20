@@ -24,6 +24,10 @@ using namespace indigo;
 
 IMPL_ERROR(BingoPgConfig, "bingo postgres config");
 
+BingoPgConfig::BingoPgConfig() {
+   _stringParams.insert("SIMILARITY_TYPE");
+}
+
 void BingoPgConfig::readDefaultConfig(const char* schema_name) {
    _rawConfig.clear();
    _tauParameters.clear();
@@ -98,6 +102,10 @@ void BingoPgConfig::updateByIndexConfig(PG_OBJECT index_ptr) {
       name_key = _rawConfig.findOrInsert("reject_invalid_structures");
       _toString(options.reject_invalid_structures, _rawConfig.value(name_key));
    }
+   if (options.ignore_bad_valence >= 0) {
+      name_key = _rawConfig.findOrInsert("ignore_bad_valence");
+      _toString(options.ignore_bad_valence, _rawConfig.value(name_key));
+   }
    if (options.fp_any_size >= 0) {
       name_key = _rawConfig.findOrInsert("fp_any_size");
       _toString(options.fp_any_size, _rawConfig.value(name_key));
@@ -138,7 +146,7 @@ void BingoPgConfig::replaceInsertParameter(uintptr_t  name_datum, uintptr_t  val
 
    int name_key = _rawConfig.findOrInsert(pname_text.getString());
    
-   _rawConfig.value(name_key).readString(value_text.getString(), false);
+   _rawConfig.value(name_key).readString(value_text.getString(), true);
 }
 
 
@@ -150,7 +158,12 @@ void BingoPgConfig::setUpBingoConfiguration() {
     * Iterate through all the configs
     */
    for (int c_idx = _rawConfig.begin(); c_idx != _rawConfig.end(); c_idx = _rawConfig.next(c_idx)) {
-      bingoSetConfigInt(_rawConfig.key(c_idx), _getNumericValue(c_idx));
+      const char* key = _rawConfig.key(c_idx);
+      if(_stringParams.find(_rawConfig.key(c_idx))) {
+         bingoSetConfigBin(_rawConfig.key(c_idx), _rawConfig.value(c_idx).ptr(), 0);
+      } else {
+         bingoSetConfigInt(_rawConfig.key(c_idx), _getNumericValue(c_idx));
+      }
    }
 
    for (int c_idx = _tauParameters.begin(); c_idx != _tauParameters.end(); c_idx = _tauParameters.next(c_idx)) {

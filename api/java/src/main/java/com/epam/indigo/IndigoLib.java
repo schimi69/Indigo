@@ -16,6 +16,7 @@ package com.epam.indigo;
 
 import com.sun.jna.Library;
 import com.sun.jna.Pointer;
+import com.sun.jna.ptr.FloatByReference;
 import com.sun.jna.ptr.IntByReference;
 import com.sun.jna.ptr.PointerByReference;
 
@@ -36,6 +37,13 @@ public interface IndigoLib extends Library
    int indigoSetOptionFloat (String name, float value);
    int indigoSetOptionColor (String name, float r, float g, float b);
    int indigoSetOptionXY (String name, int x, int y);
+   
+   Pointer indigoGetOption(String name);
+   int indigoGetOptionInt(String name, IntByReference value);
+   int indigoGetOptionBool(String name, IntByReference value);
+   int indigoGetOptionFloat(String name, FloatByReference value);
+   Pointer indigoGetOptionType(String name);
+
    int indigoResetOption ();
 
    int indigoReadFile (String filename);
@@ -69,6 +77,10 @@ public interface IndigoLib extends Library
    int indigoLoadSmartsFromFile   (String filename);
    int indigoLoadSmartsFromBuffer (byte[] buffer, int size);
 
+   int indigoLoadStructureFromString (String str, String params);
+   int indigoLoadStructureFromFile   (String filename, String params);
+   int indigoLoadStructureFromBuffer (byte[] buffer, int size, String params);
+   
    int indigoSaveMolfile (int molecule, int output);
    int indigoSaveMolfileToFile (int molecule, String filename);
    Pointer indigoMolfile (int molecule);
@@ -170,6 +182,9 @@ public interface IndigoLib extends Library
    int indigoCheckValence (int atom);
    int indigoCheckQuery (int item);
    int indigoCheckRGroups (int item);
+   int indigoCheckChirality (int item);
+   int indigoCheck3DStereo (int item);
+   int indigoCheckStereo (int item);
    int indigoCountHydrogens (int atom, IntByReference valence);
    int indigoCountImplicitHydrogens (int item);
 
@@ -404,6 +419,8 @@ public interface IndigoLib extends Library
    Pointer indigoCheckBadValence (int handle);
    Pointer indigoCheckAmbiguousH (int handle);
    int indigoFingerprint (int item, String type);
+   int indigoLoadFingerprintFromBuffer (byte[] buffer, int size);
+   int indigoLoadFingerprintFromDescriptors(double[] arr, int arr_len, int size, double density);
    int indigoCountBits (int fingerprint);
    int indigoCommonBits (int fingerprint1, int fingerprint2);
    float indigoSimilarity (int item1, int item2, String metrics);

@@ -52,6 +52,8 @@ TL_CP_GET(_sgroup_mapping)
    treat_x_as_pseudoatom = false;
    skip_3d_chirality = false;
    ignore_noncritical_query_features = false;
+   ignore_no_chiral_flag = false;
+   ignore_bad_valence = false;
 }
 
 void MolfileLoader::loadMolecule (Molecule &mol)
@@ -61,6 +63,8 @@ void MolfileLoader::loadMolecule (Molecule &mol)
    _mol = &mol;
    _qmol = 0;
    _loadMolecule();
+
+   mol.setIgnoreBadValenceFlag(ignore_bad_valence);
 
    if (mol.stereocenters.size() == 0 && !skip_3d_chirality)
       mol.stereocenters.buildFrom3dCoordinates(stereochemistry_options);
@@ -180,6 +184,7 @@ void MolfileLoader::_readCtabHeader ()
       else
          throw Error("bad molfile version : %s", version);
 
+      _bmol->setChiralFlag(chiral_int);
       _chiral = (chiral_int != 0);
    }
    catch (Scanner::Error &)
@@ -187,6 +192,9 @@ void MolfileLoader::_readCtabHeader ()
       _chiral = false;
       _v2000 = true;
    }
+
+   if (ignore_no_chiral_flag)
+      _chiral = true;
 }
 
 int MolfileLoader::_getElement (const char *buf)
@@ -978,11 +986,13 @@ void MolfileLoader::_readCtab2000 ()
             QS_DEF(Array<char>, occurrence_str);
 
             RGroup &rgroup = _bmol->rgroups.getRGroup(rgroup_idx);
+            rgroup.clear();
 
             rgroup.if_then = if_then;
             rgroup.rest_h = rest_h;
 
             _scanner.readLine(occurrence_str, true);
+
             _readRGroupOccurrenceRanges(occurrence_str.ptr(), rgroup.occurrence);
          }
          else if (strncmp(chars, "APO", 3) == 0)
@@ -2119,12 +2129,14 @@ void MolfileLoader::_postLoad ()
 
    _bmol->cis_trans.build(_ignore_cistrans.ptr());
 
+// Remove adding default R-group logic behavior
+/*
    int n_rgroups = _bmol->rgroups.getRGroupCount();
    for (i = 1; i <= n_rgroups; i++)
       if (_bmol->rgroups.getRGroup(i).occurrence.size() == 0 &&
           _bmol->rgroups.getRGroup(i).fragments.size() > 0)
          _bmol->rgroups.getRGroup(i).occurrence.push((1 << 16) | 0xFFFF);
-
+*/
    _bmol->have_xyz = true;
 }
 
@@ -2227,6 +2239,9 @@ void MolfileLoader::_readCtab3000 ()
       throw Error("error parsing COUNTS line");
 
    _chiral = (chiral_int != 0);
+
+   if (ignore_no_chiral_flag)
+      _chiral = true;
 
    _init();
 
@@ -2973,6 +2988,19 @@ void MolfileLoader::_readCtab3000 ()
                   if (c == ' ')
                      break;
                }
+            }
+            else if (strcmp(prop.ptr(), "DISP") == 0)
+            {
+               while (!strscan.isEOF())
+               {
+                  char c = strscan.readChar();
+                  if (c == ' ')
+                     break;
+               }
+            }
+            else
+            {
+               throw Error("unsupported property of CTAB3000 (in BOND block): %s", prop.ptr());
             }
          }
          _bmol->reaction_bond_reacting_center[i] = reacting_center;

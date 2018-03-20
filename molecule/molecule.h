@@ -81,6 +81,7 @@ public:
    virtual int getAtomValence (int idx);
    virtual int getAtomSubstCount (int idx);
    virtual int getAtomRingBondsCount (int idx);
+   virtual int getAtomConnectivity (int idx);
 
    virtual int getAtomMaxH   (int idx);
    virtual int getAtomMinH   (int idx);
@@ -109,7 +110,6 @@ public:
    int getImplicitH_NoThrow (int idx, int fallback);
    int calcImplicitHForConnectivity (int idx, int conn);
 
-   int getAtomConnectivity (int idx);
    int getAtomConnectivity_noImplH (int idx);
    int getAtomConnectivity_NoThrow (int idx, int fallback);
    int calcAtomConnectivity_noImplH (int idx);
@@ -149,6 +149,9 @@ public:
    static bool shouldWriteHCountEx (Molecule &mol, int idx, int h_to_ignore);
 
    bool isAromatized ();
+
+   bool getIgnoreBadValenceFlag ();
+   void setIgnoreBadValenceFlag (bool flag);
 
    // Check 
    bool isNitrogenV5 (int atom_index);
@@ -214,6 +217,8 @@ protected:
    StringPool _template_names;
 
    bool _aromatized;
+
+   bool _ignore_bad_valence;
 
    virtual void _mergeWithSubmolecule (BaseMolecule &bmol, const Array<int> &vertices,
                                        const Array<int> *edges, const Array<int> &mapping, 

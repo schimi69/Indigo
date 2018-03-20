@@ -61,6 +61,8 @@ namespace com.epam.indigo
         public const int SG_TYPE_FOR = 13;
         public const int SG_TYPE_ANY = 14;
 
+        public const uint MAX_SIZE = 1000000000;
+
         private IndigoDllLoader dll_loader;
         
         private long _sid = -1;
@@ -120,11 +122,24 @@ namespace com.epam.indigo
             setSessionID();
             checkResult(_indigo_lib.indigoDbgResetProfiling(whole_session ? 1 : 0));
         }
-        
+
+        private static int strLen(sbyte* input)
+        {
+            int res = 0;
+            do
+            {
+                if (input[res] == 0)
+                {
+                    break;
+                }
+                res++;
+            } while (res < MAX_SIZE);
+            return res;
+        }
+
         private static string _sbyteToStringUTF8(sbyte* input) 
         {
-            /// return System.Text.Encoding.UTF8.GetString(System.Text.Encoding.Default.GetBytes(new String(input)));
-            return new String(input);
+            return new string(input, 0, strLen(input), Encoding.UTF8);
         }
 
         private static void _handleError(sbyte* message, Indigo self)
@@ -330,6 +345,47 @@ namespace com.epam.indigo
             checkResult(_indigo_lib.indigoSetOptionColor(name, value.R / 255.0f, value.G / 255.0f, value.B / 255.0f));
         }
 
+
+        public string getOption(string option) 
+        {
+           setSessionID();
+           return checkResult(_indigo_lib.indigoGetOption(option));
+        }
+        
+        public int? getOptionInt(string option) 
+        {
+          setSessionID();
+          int res;
+          if (checkResult(_indigo_lib.indigoGetOptionInt(option, &res)) == 1) {
+             return res;
+          }
+          return null;
+        }
+        
+        public bool getOptionBool(string option) 
+        {
+          setSessionID();
+          int res;
+          checkResult(_indigo_lib.indigoGetOptionBool(option, &res));
+          return res > 0;
+        }
+        
+        public float? getOptionFloat(string option) 
+        {
+          setSessionID();
+          float res;
+          if (checkResult(_indigo_lib.indigoGetOptionFloat(option, &res)) == 1) {
+             return res;
+          }
+          return null;
+        }
+        
+        public string getOptionType(string option) 
+        {
+           setSessionID();
+           return checkResult(_indigo_lib.indigoGetOptionType(option));
+        }        
+
         public void resetOptions()
         {
             setSessionID();
@@ -473,6 +529,61 @@ namespace com.epam.indigo
             return new IndigoObject(this, checkResult(_indigo_lib.indigoLoadReactionSmartsFromFile(path)));
         }
 
+        public IndigoObject loadStructure(string str) 
+        {
+            return loadStructure(str, "");
+        }
+
+        public IndigoObject loadStructure(string str, string options)
+        {
+            setSessionID();
+            return new IndigoObject(this, checkResult(_indigo_lib.indigoLoadStructureFromString(str, options)));
+        }
+
+        public IndigoObject loadStructure(byte[] buf) 
+        {
+            return loadStructure(buf, "");
+        }
+
+        public IndigoObject loadStructure(byte[] buf, string options)
+        {
+            setSessionID();
+            return new IndigoObject(this, checkResult(_indigo_lib.indigoLoadStructureFromBuffer(buf, buf.Length, options)));
+        }
+
+        public IndigoObject loadStructureFromFile(string path) 
+        {
+            return loadStructureFromFile(path, "");
+        }
+
+        public IndigoObject loadStructureFromFile(string path, string options)
+        {
+            setSessionID();
+            return new IndigoObject(this, checkResult(_indigo_lib.indigoLoadStructureFromFile(path, options)));
+        }
+
+        public IndigoObject loadStructureFromBuffer(byte[] buf) {
+            return loadStructureFromBuffer(buf, "");
+        }
+
+        public IndigoObject loadStructureFromBuffer(byte[] buf, string options) {
+            setSessionID();
+            return new IndigoObject(this, checkResult(_indigo_lib.indigoLoadStructureFromBuffer(buf, buf.Length, options)));
+        }
+
+        public IndigoObject loadFingerprintFromBuffer(byte[] buf)
+        {
+            setSessionID();
+            return new IndigoObject(this, checkResult(_indigo_lib.indigoLoadFingerprintFromBuffer(buf, buf.Length)));
+        }
+
+        public IndigoObject loadFingerprintFromDescriptors(double[] descriptors, int size, double density)
+        {
+            setSessionID();
+            int result = _indigo_lib.indigoLoadFingerprintFromDescriptors(descriptors, descriptors.Length, size, density);
+            return new IndigoObject(this, checkResult(result));
+        }
+
         public IndigoObject createReaction()
         {
             setSessionID();
@@ -530,6 +641,11 @@ namespace com.epam.indigo
         {
             setSessionID();
             return new IndigoObject(this, checkResult(_indigo_lib.indigoCreateArray()));
+        }
+
+        public float similarity(IndigoObject obj1, IndigoObject obj2)
+        {
+            return similarity(obj1, obj2, "");
         }
 
         public float similarity(IndigoObject obj1, IndigoObject obj2, string metrics)
@@ -799,6 +915,16 @@ namespace com.epam.indigo
                 return null;
             }
             return new IndigoObject(this, result);
+        }
+
+        public IndigoObject iterateTautomers(IndigoObject molecule, string parameters)
+        {
+            setSessionID();
+            int result = checkResult(_indigo_lib.indigoIterateTautomers(molecule.self, parameters));
+            if (result == 0)
+                return null;
+
+            return new IndigoObject(this, result, molecule);
         }
 
         public int buildPkaModel(int level, float threshold, String filename) {

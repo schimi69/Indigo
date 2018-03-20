@@ -116,6 +116,7 @@ public:
    virtual int getAtomValence        (int idx) = 0; // >= 0 -- valence, -1 is not set explicitly
    virtual int getAtomSubstCount     (int idx) = 0;
    virtual int getAtomRingBondsCount (int idx) = 0; // >= 0 -- ring bonds count, -1 -- not sure
+   virtual int getAtomConnectivity   (int idx) = 0;
 
    int getAtomRadical_NoThrow (int idx, int fallback);
    int getAtomValence_NoThrow (int idx, int fallback);
@@ -229,7 +230,7 @@ public:
 
    bool have_xyz;
 
-   bool isChrial ();
+   bool isChiral ();
 
    struct TemplateAttPoint
    {
@@ -247,6 +248,7 @@ public:
    bool remove_scsr_lgrp = false;
    bool use_scsr_name = false;
    bool expand_mod_templates = false;
+   bool ignore_chem_templates = false;
 
    MoleculeRGroups rgroups;
 
@@ -341,6 +343,8 @@ public:
 
    int addTemplate (TGroup &tgroup);
 
+   int getChiralFlag ();
+   void setChiralFlag (int flag);
 
    DECL_ERROR;
 protected:
@@ -394,6 +398,8 @@ protected:
    bool _rGroupFragment;
 
    ObjArray< Array<int> > _attachment_index;
+
+   int _chiral_flag = -1;
 
    // When molecule gets edited then edit revision is increased.
    // If edit revision is the same then molecule wasn't edited

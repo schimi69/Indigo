@@ -42,10 +42,14 @@ class Bingo(object):
         self._lib.bingoCloseDatabase.argtypes = [c_int]
         self._lib.bingoInsertRecordObj.restype = c_int
         self._lib.bingoInsertRecordObj.argtypes = [c_int, c_int]
+        self._lib.bingoInsertRecordObjWithExtFP.restype = c_int
+        self._lib.bingoInsertRecordObjWithExtFP.argtypes = [c_int, c_int, c_int]
         self._lib.bingoGetRecordObj.restype = c_int
         self._lib.bingoGetRecordObj.argtypes = [c_int, c_int]
         self._lib.bingoInsertRecordObjWithId.restype = c_int
         self._lib.bingoInsertRecordObjWithId.argtypes = [c_int, c_int, c_int]
+        self._lib.bingoInsertRecordObjWithIdAndExtFP.restype = c_int
+        self._lib.bingoInsertRecordObjWithIdAndExtFP.argtypes = [c_int, c_int, c_int, c_int]
         self._lib.bingoDeleteRecord.restype = c_int
         self._lib.bingoDeleteRecord.argtypes = [c_int, c_int]
         self._lib.bingoSearchSub.restype = c_int
@@ -56,6 +60,12 @@ class Bingo(object):
         self._lib.bingoSearchMolFormula.argtypes = [c_int, c_char_p, c_char_p]
         self._lib.bingoSearchSim.restype = c_int
         self._lib.bingoSearchSim.argtypes = [c_int, c_int, c_float, c_float, c_char_p]
+        self._lib.bingoSearchSimWithExtFP.restype = c_int
+        self._lib.bingoSearchSimWithExtFP.argtypes = [c_int, c_int, c_float, c_float, c_int, c_char_p]
+        self._lib.bingoSearchSimTopN.restype = c_int
+        self._lib.bingoSearchSimTopN.argtypes = [c_int, c_int, c_int, c_float, c_char_p]
+        self._lib.bingoSearchSimTopNWithExtFP.restype = c_int
+        self._lib.bingoSearchSimTopNWithExtFP.argtypes = [c_int, c_int, c_int, c_float, c_int, c_char_p]
         self._lib.bingoEnumerateId.restype = c_int
         self._lib.bingoEnumerateId.argtypes = [c_int]
         self._lib.bingoNext.restype = c_int
@@ -76,6 +86,16 @@ class Bingo(object):
         self._lib.bingoEstimateRemainingResultsCountError.argtypes = [c_int]
         self._lib.bingoEstimateRemainingTime.restype = c_int
         self._lib.bingoEstimateRemainingTime.argtypes = [c_int, POINTER(c_float)]
+        self._lib.bingoContainersCount.restype = c_int
+        self._lib.bingoContainersCount.argtypes = [c_int]
+        self._lib.bingoCellsCount.restype = c_int
+        self._lib.bingoCellsCount.argtypes = [c_int]
+        self._lib.bingoCurrentCell.restype = c_int
+        self._lib.bingoCurrentCell.argtypes = [c_int]
+        self._lib.bingoMinCell.restype = c_int
+        self._lib.bingoMinCell.argtypes = [c_int]
+        self._lib.bingoMaxCell.restype = c_int
+        self._lib.bingoMaxCell.argtypes = [c_int]
 
     def __del__(self):
         self.close()
@@ -150,6 +170,14 @@ class Bingo(object):
             return Bingo._checkResult(self._indigo,
                                       self._lib.bingoInsertRecordObjWithId(self._id, indigoObject.id, index))
 
+    def insertWithExtFP(self, indigoObject, ext_fp, index=None):
+        self._indigo._setSessionId()
+        if not index:
+            return Bingo._checkResult(self._indigo, self._lib.bingoInsertRecordObjWithExtFP(self._id, indigoObject.id, ext_fp.id))
+        else:
+            return Bingo._checkResult(self._indigo,
+                                      self._lib.bingoInsertRecordObjWithIdAndExtFP(self._id, indigoObject.id, index, ext_fp.id))
+
     def delete(self, index):
         self._indigo._setSessionId()
         Bingo._checkResult(self._indigo, self._lib.bingoDeleteRecord(self._id, index))
@@ -174,6 +202,30 @@ class Bingo(object):
             metric = 'tanimoto'
         return BingoObject(
             Bingo._checkResult(self._indigo, self._lib.bingoSearchSim(self._id, query.id, minSim, maxSim, metric.encode('ascii'))),
+            self._indigo, self)
+
+    def searchSimWithExtFP(self, query, minSim, maxSim, ext_fp, metric='tanimoto'):
+        self._indigo._setSessionId()
+        if not metric:
+            metric = 'tanimoto'
+        return BingoObject(
+            Bingo._checkResult(self._indigo, self._lib.bingoSearchSimWithExtFP(self._id, query.id, minSim, maxSim, ext_fp.id, metric.encode('ascii'))),
+            self._indigo, self)
+
+    def searchSimTopN(self, query, limit, minSim, metric='tanimoto'):
+        self._indigo._setSessionId()
+        if not metric:
+            metric = 'tanimoto'
+        return BingoObject(
+            Bingo._checkResult(self._indigo, self._lib.bingoSearchSimTopN(self._id, query.id, limit, minSim, metric.encode('ascii'))),
+            self._indigo, self)
+
+    def searchSimTopNWithExtFP(self, query, limit, minSim, ext_fp, metric='tanimoto'):
+        self._indigo._setSessionId()
+        if not metric:
+            metric = 'tanimoto'
+        return BingoObject(
+            Bingo._checkResult(self._indigo, self._lib.bingoSearchSimTopNWithExtFP(self._id, query.id, limit, minSim, ext_fp.id, metric.encode('ascii'))),
             self._indigo, self)
 
     def enumerateId(self):
@@ -241,3 +293,23 @@ class BingoObject(object):
         value = c_float()
         Bingo._checkResult(self._indigo, self._bingo._lib.bingoEstimateRemainingTime(self._id, pointer(value)))
         return value.value
+
+    def containersCount(self):
+        self._indigo._setSessionId()
+        return Bingo._checkResult(self._indigo, self._bingo._lib.bingoContainersCount(self._id))
+
+    def cellsCount(self):
+        self._indigo._setSessionId()
+        return Bingo._checkResult(self._indigo, self._bingo._lib.bingoCellsCount(self._id))
+
+    def currentCell(self):
+        self._indigo._setSessionId()
+        return Bingo._checkResult(self._indigo, self._bingo._lib.bingoCurrentCell(self._id))
+
+    def minCell(self):
+        self._indigo._setSessionId()
+        return Bingo._checkResult(self._indigo, self._bingo._lib.bingoMinCell(self._id))
+
+    def maxCell(self):
+        self._indigo._setSessionId()
+        return Bingo._checkResult(self._indigo, self._bingo._lib.bingoMaxCell(self._id))

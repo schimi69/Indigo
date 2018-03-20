@@ -24,10 +24,11 @@ import java.util.*;
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 import java.util.stream.Collectors;
-
 /**
- * Class for various utilities
- * Created by Artem_Malykh on 8/14/2015.
+ * Class represents a collection of useful methods for overall project such as encoding, fingerprint coding, etc...
+ *
+ * @author Artem Malykh
+ * created on 2015-08-14
  */
 public class Utils {
     private static byte[] BASE_62_ALPHABET = {48,
@@ -56,17 +57,17 @@ public class Utils {
         return Utils.generateSequence(nums, " AND ", (stringBuilder, s) -> stringBuilder.append(fingerprintFieldName).append(":").append("\"").append(s).append("\"").append(" AND "));
     }
 
-    public static String produceSolrSimilarityQuery(IndigoObject mol, String fingerprintFieldName, boolean negate) {
-        mol.aromatize();
-        List<String> nums = fingerprintToBitNums(mol.fingerprint());
+    public static String produceSolrSimilarityQuery(IndigoObject chem, String fingerprintFieldName, boolean negate) {
+        chem.aromatize();
+        List<String> nums = fingerprintToBitNums(chem.fingerprint());
         if (negate) {
             nums = nums.stream().map(s -> "-" + s).collect(Collectors.toList());
         }
         return Utils.generateSequence(nums, " OR ", (stringBuilder, s) -> stringBuilder.append(fingerprintFieldName).append(":").append("\"").append(s).append("\"").append(" OR "));
     }
 
-    public static String produceSolrSimilarityQuery(IndigoObject mol, String fingerprintFieldName) {
-        return produceSolrSimilarityQuery(mol, fingerprintFieldName, false);
+    public static String produceSolrSimilarityQuery(IndigoObject chem, String fingerprintFieldName) {
+        return produceSolrSimilarityQuery(chem, fingerprintFieldName, false);
     }
 
     /**

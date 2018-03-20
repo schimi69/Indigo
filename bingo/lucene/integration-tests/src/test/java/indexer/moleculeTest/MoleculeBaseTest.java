@@ -25,7 +25,7 @@ import java.io.FileReader;
 import java.io.IOException;
 
 /**
- * Base tests with some useful methods for testing.
+ * Base tests with some useful methods for extended testing.
  * Created by Artem_Malykh on 9/9/2015.
  */
 public class MoleculeBaseTest {
@@ -33,8 +33,6 @@ public class MoleculeBaseTest {
 
     public static final String BENZOL         = "c1ccccc1";
     public static final String TEST_CORE_NAME = "moldocs";
-    public static final String REACTION = "[I-].[Na+].C=CCBr>>[Na+].[Br-].C=CCI";
-
 
     CollectionRepresentation<TestSchema> testCollection;
 

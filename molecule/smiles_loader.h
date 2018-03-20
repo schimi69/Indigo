@@ -59,6 +59,7 @@ public:
 
    StereocentersOptions stereochemistry_options;
    bool ignore_cistrans_errors;
+   bool ignore_bad_valence;
 
 protected:
 
@@ -175,6 +176,8 @@ protected:
                    AutoPtr<QueryMolecule::Bond> &qbond);
    void _readBondSub (Array<char> &bond_str, _BondDesc &bond,
                       AutoPtr<QueryMolecule::Bond> &qbond);
+   void _readRGroupOccurrenceRanges (const char *str, Array<int> &ranges);
+
 
 private:
    SmilesLoader (const SmilesLoader &); // no implicit copy

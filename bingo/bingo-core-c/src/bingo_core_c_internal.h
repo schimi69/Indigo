@@ -53,6 +53,7 @@ public:
    void reset ();
 
    static BingoCore& getInstance ();
+   int getTimeout();
 
    Array<char> error;
    Array<char> warning;
@@ -102,7 +103,10 @@ public:
    byte *test_ptr;
 };
 
-#define BINGO_BEGIN { BingoCore &self = BingoCore::getInstance(); try { self.error.clear();
+
+
+
+#define BINGO_BEGIN { BingoCore &self = BingoCore::getInstance(); try { self.error.clear(); 
 
 #define BINGO_END(success, fail) } catch (Exception &ex) \
       { self.error.readString(ex.message(), true); \
@@ -111,6 +115,19 @@ public:
             self.error_handler_context); \
          return fail; } \
       return success; }
+
+
+#define BINGO_BEGIN_TIMEOUT { BingoCore &self = BingoCore::getInstance(); try {  \
+         self.error.clear(); \
+         int timeout = self.getTimeout(); \
+         CancellationHandler* res = nullptr; \
+         if(timeout > 0) { \
+            res = new TimeoutCancellationHandler(timeout); \
+         }  \
+         AutoCancellationHandler handler(res); 
+
+
+
 
 #define TRY_READ_TARGET_MOL \
    try {
@@ -127,7 +144,9 @@ public:
    catch (Molecule::Error &e) { action;} \
    catch (MoleculeAutoLoader::Error &e) { action;} \
    catch (EmbeddingEnumerator::TimeoutException &e) { action;} \
-   catch (DearomatizationsGroups::Error&e) {action;}
+   catch (DearomatizationsGroups::Error&e) {action;} \
+   catch (MoleculePiSystemsMatcher::Error&e) {action;} \
+   catch (SkewSymmetricNetwork::Error&e) {action;}
 
    //catch (IcmLoader::Error &e) { action;} \
 
@@ -147,7 +166,11 @@ public:
    catch (RSmilesLoader::Error &e) { action;} \
    catch (Molecule::Error &e) { action;} \
    catch (Reaction::Error &e) { action;} \
-   catch (ReactionAutoLoader::Error &e) { action;} 
+   catch (ReactionAutoLoader::Error &e) { action;} \
+   catch (EmbeddingEnumerator::TimeoutException &e) { action;} \
+   catch (DearomatizationsGroups::Error&e) {action;} \
+   catch (MoleculePiSystemsMatcher::Error&e) {action;} \
+   catch (SkewSymmetricNetwork::Error&e) {action;}
 
 }
 }

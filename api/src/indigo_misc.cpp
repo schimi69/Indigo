@@ -34,6 +34,7 @@
 #include "indigo_savers.h"
 #include "molecule/molecule_standardize.h"
 #include "molecule/molecule_ionize.h"
+#include "molecule/molecule_automorphism_search.h"
 
 #define CHECKRGB(r, g, b) \
 if (__min3(r, g, b) < 0 || __max3(r, g, b) > 1.0 + 1e-6) \
@@ -1141,6 +1142,152 @@ CEXPORT int indigoTransformHELMtoSCSR (int object)
       }
       else
          throw IndigoError("indigoTransformHELMtoSCSR: expected molecule, got %s", obj.debugInfo());
+   }
+   INDIGO_END(-1);
+}
+
+
+CEXPORT int indigoCheckQuery (int item)
+{
+   INDIGO_BEGIN
+   {
+      IndigoObject &obj = self.getObject(item);
+
+      if (IndigoAtom::is(obj))
+      {
+         IndigoAtom &ia = IndigoAtom::cast(obj);
+
+         if ( (ia.mol.reaction_atom_exact_change[ia.idx] != 0) ||
+              (ia.mol.reaction_atom_inversion[ia.idx] != 0) )
+            return 1;
+
+         if (ia.mol.isQueryMolecule())
+         {
+            return 1;
+         } 
+      }
+      else if (IndigoBond::is(obj))
+      {
+         IndigoBond &ib = IndigoBond::cast(obj);
+
+         if (ib.mol.reaction_bond_reacting_center[ib.idx] != 0) 
+            return 1;
+
+         if (ib.mol.isQueryMolecule())
+         {
+            return 1;
+         }
+      } else if (IndigoQueryMolecule::is(obj)) {
+         return 1;
+      } else if (IndigoQueryReaction::is(obj)) {
+         return 1;
+      }
+      return 0;
+   }
+   INDIGO_END(-1);
+}
+
+CEXPORT int indigoCheckChirality (int item)
+{
+   INDIGO_BEGIN
+   {
+      IndigoObject &obj = self.getObject(item);
+
+      if (IndigoBaseMolecule::is(obj))
+      {
+         BaseMolecule &bmol = obj.getBaseMolecule();
+         int chiral_flag = bmol.getChiralFlag();
+         if (chiral_flag == -1)
+         {
+            return 1;
+         }
+         else if ( (chiral_flag > 0) && (bmol.stereocenters.size() == 0) )
+         {
+            return 0;
+         }
+      }
+      return 1;
+   }
+   INDIGO_END(-1);
+}
+
+CEXPORT int indigoCheck3DStereo (int item)
+{
+   INDIGO_BEGIN
+   {
+      IndigoObject &obj = self.getObject(item);
+
+      if (IndigoBaseMolecule::is(obj))
+      {
+         BaseMolecule &bmol = obj.getBaseMolecule();
+
+         bool stereo_3d = true;
+  
+         if ( (bmol.stereocenters.size() > 0) && BaseMolecule::hasZCoord(bmol) )
+         {
+            for (auto i : bmol.vertices())
+            {
+               if (!bmol.stereocenters.exists(i))
+               {
+                  const Vertex &vertex = bmol.getVertex(i);
+
+                  for (auto j = vertex.neiBegin(); j != vertex.neiEnd(); j = vertex.neiNext(j))
+                     if (bmol.getBondDirection2(i, vertex.neiVertex(j)) > 0)
+                        stereo_3d = false;
+               }
+            }                          
+         }
+         else
+            stereo_3d = false;
+
+         if (stereo_3d)
+            return 1;
+      }
+      return 0;
+   }
+   INDIGO_END(-1);
+}
+
+CEXPORT int indigoCheckStereo (int item)
+{
+   INDIGO_BEGIN
+   {
+      IndigoObject &obj = self.getObject(item);
+
+      if (IndigoBaseMolecule::is(obj))
+      {
+         Molecule &mol = obj.getMolecule();
+         QS_DEF(Molecule, target);
+         target.clone_KeepIndices(mol);
+
+         for (auto i : target.vertices())
+         {
+            if (!target.stereocenters.exists(i) && target.stereocenters.isPossibleStereocenter(i))
+            {
+               target.stereocenters.add(i, MoleculeStereocenters::ATOM_ABS, 0, false);
+            }
+         }                          
+
+         MoleculeAutomorphismSearch as;
+      
+         as.detect_invalid_cistrans_bonds = true;
+         as.detect_invalid_stereocenters = true;
+         as.find_canonical_ordering = false;
+         as.process(target);
+
+         for (auto i : target.vertices())
+         {
+            if (target.stereocenters.exists(i) && as.invalidStereocenter(i))
+            {
+               target.stereocenters.remove(i);
+            }
+         }                          
+
+         if (mol.stereocenters.size() != target.stereocenters.size())
+            return 1;
+
+      }
+      return 0;
    }
    INDIGO_END(-1);
 }

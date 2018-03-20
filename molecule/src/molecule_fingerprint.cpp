@@ -12,6 +12,8 @@
  * WARRANTY OF DESIGN, MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE.
  ***************************************************************************/
 
+#include <map>
+#include <molecule/molecule_morgan_fingerprint_builder.h>
 #include "base_c/bitarray.h"
 #include "base_cpp/output.h"
 
@@ -223,6 +225,71 @@ void MoleculeFingerprintBuilder::parseFingerprintType(const char *type, bool que
       throw Error("unknown molecule fingerprint type: %s", type);
 }
 
+/**
+ * Accepted types: 'SIM', 'CHEM', 'ECFP2', 'ECFP4', 'ECFP6', 'FCFP2', 'FCFP4', 'FCFP6'
+ * */
+SimilarityType MoleculeFingerprintBuilder::parseSimilarityType(const char * type) {
+   if(type == 0 || *type == 0)
+      return SimilarityType::SIM;
+   else if(strcasecmp(type, "SIM") == 0)
+      return SimilarityType::SIM;
+   else if(strcasecmp(type, "CHEM") == 0)
+      return SimilarityType::CHEM;
+   else if(strcasecmp(type, "ECFP2") == 0)
+      return SimilarityType::ECFP2;
+   else if(strcasecmp(type, "ECFP4") == 0)
+      return SimilarityType::ECFP4;
+   else if(strcasecmp(type, "ECFP6") == 0)
+      return SimilarityType::ECFP6;
+   else if(strcasecmp(type, "ECFP8") == 0)
+      return SimilarityType::ECFP8;
+   else
+      throw Exception("Unknown similarity type '%s'", type);
+
+   /* TODO: implement FCFP fingerprints
+   else if(strcasecmp(type, "FCFP2") == 0)
+      return SimilarityType::FCFP2;
+   else if(strcasecmp(type, "FCFP4") == 0)
+      return SimilarityType::FCFP4;
+   else if(strcasecmp(type, "FCFP6") == 0)
+      return SimilarityType::FCFP6;
+   else if(strcasecmp(type, "FCFP8") == 0)
+      return SimilarityType::FCFP8;
+   else
+      throw Exception("Unknown similarity type '%s'", type);
+   */
+}
+
+const char * MoleculeFingerprintBuilder::printSimilarityType(SimilarityType type) {
+   switch(type) {
+      case SimilarityType::SIM   : return "SIM";
+      case SimilarityType::CHEM  : return "CHEM";
+      case SimilarityType::ECFP2 : return "ECFP2";
+      case SimilarityType::ECFP4 : return "ECFP4";
+      case SimilarityType::ECFP6 : return "ECFP6";
+      case SimilarityType::ECFP8 : return "ECFP8";
+      case SimilarityType::FCFP2 : return "FCFP2";
+      case SimilarityType::FCFP4 : return "FCFP4";
+      case SimilarityType::FCFP6 : return "FCFP6";
+      case SimilarityType::FCFP8 : return "FCFP8";
+      default: return nullptr;
+   }
+}
+
+int MoleculeFingerprintBuilder::getSimilarityTypeOrder(SimilarityType type) {
+   switch(type) {
+      case SimilarityType::ECFP2 : return 1;
+      case SimilarityType::ECFP4 : return 2;
+      case SimilarityType::ECFP6 : return 3;
+      case SimilarityType::ECFP8 : return 4;
+      case SimilarityType::FCFP2 : return 1;
+      case SimilarityType::FCFP4 : return 2;
+      case SimilarityType::FCFP6 : return 3;
+      case SimilarityType::FCFP8 : return 4;
+      default: return -1;
+   }
+}
+
 bool MoleculeFingerprintBuilder::_handleCycle (Graph &graph,
         const Array<int> &vertices, const Array<int> &edges, void *context)
 {
@@ -352,7 +419,8 @@ void MoleculeFingerprintBuilder::_canonicalizeFragmentAndSetBits (BaseMolecule &
    if (subgraph_type == TautomerSuperStructure::ORIGINAL)
    {
       // SIM is made of: rings of size up to 6, trees of size up to 4 edges
-      if (use_atoms && use_bonds && !skip_sim && _parameters.sim_qwords > 0)
+      if (use_atoms && use_bonds && !skip_sim && _parameters.sim_qwords > 0 &&
+            _parameters.similarity_type == SimilarityType::SIM)
       {
          set_sim = true;
          if (vertices.size() > 6)
@@ -545,55 +613,199 @@ void MoleculeFingerprintBuilder::_makeFingerprint (BaseMolecule &mol)
    
    if (!skip_ord || !skip_any_atoms || !skip_any_atoms_bonds ||
        !skip_any_bonds || !skip_tau || !skip_sim)
-   {
-      QS_DEF(Filter, vfilter);
-      vfilter.initAll(mol_for_enumeration->vertexEnd());
+      _makeFingerprint_calcOrdSim(*mol_for_enumeration);
 
-      // remove (possible) hydrogens
-      for (auto v : mol_for_enumeration->vertices())
-         if (mol_for_enumeration->possibleAtomNumber(v, ELEM_H))
-            vfilter.hide(v);
-
-      _initHashCalculations(*mol_for_enumeration, vfilter);
-
-      CycleEnumerator ce(*mol_for_enumeration);
-      GraphSubtreeEnumerator se(*mol_for_enumeration);
-
-      ce.vfilter = &vfilter;
-      se.vfilter = &vfilter;
-
-      bool sim_only = skip_ord && skip_tau && skip_any_atoms &&
-                      skip_any_atoms_bonds && skip_any_bonds;
-
-      _is_cycle = true;
-      ce.context = this;
-      ce.max_length = sim_only ? 6 : 8;
-      ce.cb_handle_cycle = _handleCycle;
-      ce.process();
-   
-      _is_cycle = false;
-      se.context = this;
-      se.min_vertices = 1;
-      se.max_vertices = sim_only ? 5 : 7;
-      se.handle_maximal = false;
-      se.maximal_critera_value_callback = _maximalSubgraphCriteriaValue;
-      se.callback = _handleTree;
-      se.process();
-
-      // Set hash bits
-      for (auto it : _ord_hashes)
-      {
-         int bits_per_fragment = it.first.bits_per_fragment + (bitLog2Dword(it.second) - 1);
-         // Heuristic: if a fragment has high frequency and they are close to each other (like in substructure query)
-         // then there should be larger fragment with lower frequency
-         if (bits_per_fragment > 8)
-            bits_per_fragment = 8;
-         _setBits(it.first.hash, getOrd(), _parameters.fingerprintSizeOrd(), bits_per_fragment);
-      }
-   }
-   
    if (!skip_ext && _parameters.ext)
       _calcExtraBits(mol);
+
+   if (!skip_sim && _parameters.sim_qwords > 0) {
+      SimilarityType similarityType = _parameters.similarity_type;
+      int order = getSimilarityTypeOrder(similarityType);
+
+      if(order > 0) {  // Morgan fingerprints
+         MoleculeMorganFingerprintBuilder builder(mol);
+
+         QS_DEF(Array<byte>, buf);
+         buf.resize(_parameters.fingerprintSizeSim());
+
+         switch (similarityType) {
+            case SimilarityType::ECFP2 :
+            case SimilarityType::ECFP4 :
+            case SimilarityType::ECFP6 :
+            case SimilarityType::ECFP8 :
+               builder.packFingerprintECFP(order, buf);
+               break;
+            case SimilarityType::FCFP2 :
+            case SimilarityType::FCFP4 :
+            case SimilarityType::FCFP6 :
+            case SimilarityType::FCFP8 :
+               builder.packFingerprintFCFP(order, buf);
+               break;
+            default:
+               throw Error("Unknown Morgan similarity type %s", similarityType);
+         }
+
+         memcpy(getSim(), buf.ptr(), static_cast<size_t>(_parameters.fingerprintSizeSim()));
+      } else {
+         switch (similarityType) {
+            case SimilarityType::SIM:
+               // Has already been calculated in `_makeFingerprint_calcOrdSim(...)`
+               break;
+            case SimilarityType::CHEM :
+               _makeFingerprint_calcChem(mol);
+               break;
+            default:
+               throw Error("Unknown non-Morgan similarity type %s", similarityType);
+         }
+      }
+   }
+}
+
+void MoleculeFingerprintBuilder::_makeFingerprint_calcOrdSim(BaseMolecule &mol)
+{
+   QS_DEF(Filter, vfilter);
+   vfilter.initAll(mol.vertexEnd());
+
+   // remove (possible) hydrogens
+   for (auto v : mol.vertices())
+      if (mol.possibleAtomNumber(v, ELEM_H))
+         vfilter.hide(v);
+
+   _initHashCalculations(mol, vfilter);
+
+   CycleEnumerator ce(mol);
+   GraphSubtreeEnumerator se(mol);
+
+   ce.vfilter = &vfilter;
+   se.vfilter = &vfilter;
+
+   bool sim_only = skip_ord && skip_tau && skip_any_atoms &&
+                   skip_any_atoms_bonds && skip_any_bonds;
+
+   _is_cycle = true;
+   ce.context = this;
+   ce.max_length = sim_only ? 6 : 8;
+   ce.cb_handle_cycle = _handleCycle;
+   ce.process();
+
+   _is_cycle = false;
+   se.context = this;
+   se.min_vertices = 1;
+   se.max_vertices = sim_only ? 5 : 7;
+   se.handle_maximal = false;
+   se.maximal_critera_value_callback = _maximalSubgraphCriteriaValue;
+   se.callback = _handleTree;
+   se.process();
+
+   // Set hash bits
+   for (auto it : _ord_hashes)
+   {
+      int bits_per_fragment = it.first.bits_per_fragment + (bitLog2Dword(it.second) - 1);
+      // Heuristic: if a fragment has high frequency and they are close to each other (like in substructure query)
+      // then there should be larger fragment with lower frequency
+      if (bits_per_fragment > 8)
+         bits_per_fragment = 8;
+      _setBits(it.first.hash, getOrd(), _parameters.fingerprintSizeOrd(), bits_per_fragment);
+   }
+}
+
+void MoleculeFingerprintBuilder::_makeFingerprint_calcChem(BaseMolecule &mol)
+{
+   // For `mol.getAtomConnectivity(idx)` to return consistent
+   // results on aromatic compounds
+   try
+   {
+      mol.asMolecule().invalidateHCounters();
+   }
+   catch (indigo::Exception & e)
+   {
+      // Since `mol` is (probably) `QueryMolecule`,
+      // connectivity doesn't matter anyway
+   }
+
+   std::map<dword, int> counters;
+
+   QS_DEF(Array<int>, feature_set);
+   for(auto vi : mol.vertices())
+   {
+      // No exception should ever be thrown, added the try-catch just to be sure
+      try
+      {
+         bool res = MoleculePkaModel::getAtomLocalFeatureSet(mol, vi, feature_set);
+         if(!res) continue;  // skippable atom
+      }
+      catch (indigo::Exception &e)
+      {
+         continue;
+      }
+
+      dword key = 1;
+      key = key * 37 + feature_set[0]; // number
+      key = key * 37 + feature_set[4]; // iso
+      key = key * 37 + feature_set[2]; // charge
+      key = key * 37 + feature_set[3]; // radical
+      key = key * 37 + feature_set[7]; // degree
+
+      auto pair = counters.find(key);
+      int value = (pair != counters.end()) ? pair->second : 0;
+      counters[key] = value + 1;  // increment the counter for the key
+   }
+
+   QS_DEF(Array<int>, feature_set1);
+   QS_DEF(Array<int>, feature_set2);
+   for(auto ei : mol.edges())
+   {
+      // No exception should ever be thrown, added the try-catch just to be sure
+      try
+      {
+         bool res1 = MoleculePkaModel::getAtomLocalFeatureSet(mol, mol.getEdge(ei).beg, feature_set1);
+         bool res2 = MoleculePkaModel::getAtomLocalFeatureSet(mol, mol.getEdge(ei).end, feature_set2);
+         if (!res1 || !res2) continue;  // skippable atoms
+      }
+      catch (indigo::Exception &e)
+      {
+         continue;
+      }
+
+      Array<int> * fs1, * fs2;  // ordered `feature_set1` and `feature_set2`
+      if(feature_set1.memcmp(feature_set2) < 0)
+      {
+         fs1 = &feature_set1;
+         fs2 = &feature_set2;
+      }
+      else
+      {
+         fs1 = &feature_set2;
+         fs2 = &feature_set1;
+      }
+
+      dword key = 1;
+      key = key * 37 + mol.getBondOrder(ei);
+      key = key * 37 + mol.getBondDirection(ei);
+
+      key = key * 37 + (*fs1)[0]; // number
+      key = key * 37 + (*fs1)[4]; // iso
+      key = key * 37 + (*fs1)[2]; // charge
+      key = key * 37 + (*fs1)[3]; // radical
+      key = key * 37 + (*fs1)[7]; // degree
+
+      key = key * 37 + (*fs2)[0]; // number
+      key = key * 37 + (*fs2)[4]; // iso
+      key = key * 37 + (*fs2)[2]; // charge
+      key = key * 37 + (*fs2)[3]; // radical
+      key = key * 37 + (*fs2)[7]; // degree
+
+      auto pair = counters.find(key);
+      int value = (pair != counters.end()) ? pair->second : 0;
+      counters[key] = value + 1;  // increment the counter for the key
+   }
+
+   for(auto pair : counters)
+   {
+      dword key = pair.first;
+      int count = pair.second;
+      _setBits(key, getSim(), _parameters.fingerprintSizeSim(), count);
+   }
 }
 
 void MoleculeFingerprintBuilder::_calcExtraBits (BaseMolecule &mol)

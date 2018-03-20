@@ -16,6 +16,7 @@
 
 #include "base_cpp/profiling.h"
 #include "gzip/gzip_scanner.h"
+#include "base_cpp/cancellation_handler.h"
 
 using namespace indigo::bingo_core;
 
@@ -58,6 +59,15 @@ BingoCore& BingoCore::getInstance ()
 {
    TL_GET(BingoCore, self);
    return self;
+}
+
+
+int BingoCore::getTimeout ()
+{
+   if (bingo_context != 0 && bingo_context->timeout > 0) {
+      return bingo_context->timeout;
+   }
+   return 0;
 }
 
 CEXPORT const char * bingoGetVersion ()
@@ -154,6 +164,8 @@ CEXPORT int bingoSetConfigInt (const char *name, int value)
          self.bingo_context->zero_unknown_aromatic_hydrogens = (value != 0);
       else if (strcasecmp(name, "reject-invalid-structures") == 0 || strcasecmp(name, "reject_invalid_structures") == 0)
          self.bingo_context->reject_invalid_structures = (value != 0);
+      else if (strcasecmp(name, "ignore-bad-valence") == 0 || strcasecmp(name, "ignore_bad_valence") == 0)
+         self.bingo_context->ignore_bad_valence = (value != 0);
       else
       {
          bool set = true;
@@ -223,6 +235,8 @@ CEXPORT int bingoGetConfigInt (const char *name, int *value)
          *value = (int)self.bingo_context->zero_unknown_aromatic_hydrogens;
       else if (strcasecmp(name, "reject-invalid-structures") == 0 || strcasecmp(name, "reject_invalid_structures") == 0)
          *value = (int) self.bingo_context->reject_invalid_structures;
+      else if (strcasecmp(name, "ignore-bad-valence") == 0 || strcasecmp(name, "ignore_bad_valence") == 0)
+         *value = (int) self.bingo_context->ignore_bad_valence;
       else
          throw BingoError("unknown parameter name: %s", name);
    }
@@ -260,6 +274,11 @@ CEXPORT int bingoSetConfigBin (const char *name, const char *value, int len)
       {
          BufferScanner scanner(value, len);
          self.bingo_context->cmf_dict.load(scanner);
+      }
+      else if (strcasecmp(name, "SIMILARITY_TYPE") == 0 || strcasecmp(name, "SIMILARITY-TYPE") == 0)
+      {
+         self.bingo_context->fp_parameters.similarity_type =
+               MoleculeFingerprintBuilder::parseSimilarityType(value);
       }
       else
          throw BingoError("unknown parameter name: %s", name);

@@ -212,6 +212,9 @@ _IndigoBasicOptionsHandlersSetter::_IndigoBasicOptionsHandlersSetter ()
    
    mgr.setOptionHandlerBool("ignore-stereochemistry-errors", SETTER_GETTER_BOOL_OPTION(indigo.stereochemistry_options.ignore_errors));
    mgr.setOptionHandlerBool("ignore-noncritical-query-features", SETTER_GETTER_BOOL_OPTION(indigo.ignore_noncritical_query_features));
+   mgr.setOptionHandlerBool("ignore-no-chiral-flag", SETTER_GETTER_BOOL_OPTION(indigo.ignore_no_chiral_flag));
+   mgr.setOptionHandlerBool("ignore-closing-bond-direction-mismatch", SETTER_GETTER_BOOL_OPTION(indigo.ignore_closing_bond_direction_mismatch));
+   mgr.setOptionHandlerBool("ignore-bad-valence", SETTER_GETTER_BOOL_OPTION(indigo.ignore_bad_valence));
    mgr.setOptionHandlerBool("treat-x-as-pseudoatom", SETTER_GETTER_BOOL_OPTION(indigo.treat_x_as_pseudoatom));
    mgr.setOptionHandlerBool("skip-3d-chirality", SETTER_GETTER_BOOL_OPTION(indigo.skip_3d_chirality));
    mgr.setOptionHandlerBool("deconvolution-aromatization", SETTER_GETTER_BOOL_OPTION(indigo.deconvolution_aromatization));
@@ -231,6 +234,16 @@ _IndigoBasicOptionsHandlersSetter::_IndigoBasicOptionsHandlersSetter ()
    mgr.setOptionHandlerBool("fp-ext-enabled", SETTER_GETTER_BOOL_OPTION(indigo.fp_params.ext));
    mgr.setOptionHandlerBool("smart-layout", SETTER_GETTER_BOOL_OPTION(indigo.smart_layout));
    mgr.setOptionHandlerString("layout-orientation", indigoSetLayoutOrientation, indigoGetLayoutOrientation);
+   mgr.setOptionHandlerString("similarity-type",
+                              [](const char *value) {
+                                 indigo.fp_params.similarity_type =
+                                       MoleculeFingerprintBuilder::parseSimilarityType(value);
+                              },
+                              [](Array<char> &value) {
+                                 const char *str = MoleculeFingerprintBuilder::printSimilarityType(
+                                       indigo.fp_params.similarity_type);
+                                 value.copy(str, strlen(str));
+                              });
 
    mgr.setOptionHandlerString("embedding-uniqueness", indigoSetEmbeddingUniqueness, indigoGetEmbeddingUniqueness);
    mgr.setOptionHandlerInt("max-embeddings", indigoSetMaxEmbeddings, indigoGetMaxEmbeddings);
@@ -295,6 +308,9 @@ _IndigoBasicOptionsHandlersSetter::_IndigoBasicOptionsHandlersSetter ()
 
    mgr.setOptionHandlerBool("mass-skip-error-on-pseudoatoms", SETTER_GETTER_BOOL_OPTION(indigo.mass_options.skip_error_on_pseudoatoms));
    mgr.setOptionHandlerBool("gross-formula-add-rsites", SETTER_GETTER_BOOL_OPTION(indigo.gross_formula_options.add_rsites));
+   mgr.setOptionHandlerBool("gross-formula-add-isotopes", SETTER_GETTER_BOOL_OPTION(indigo.gross_formula_options.add_isotopes));
+
+   mgr.setOptionHandlerBool("scsr-ignore-chem-templates", SETTER_GETTER_BOOL_OPTION(indigo.scsr_ignore_chem_templates));
 }
 
 _IndigoBasicOptionsHandlersSetter::~_IndigoBasicOptionsHandlersSetter ()

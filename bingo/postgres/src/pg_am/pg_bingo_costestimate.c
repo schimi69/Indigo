@@ -6,6 +6,12 @@
 #include "nodes/relation.h"
 #include "optimizer/cost.h"
 
+#if PG_VERSION_NUM / 100 >= 902
+#include "optimizer/predtest.h"
+#include "utils/selfuncs.h"
+#include "utils/spccache.h"
+#endif
+
 /*
 #include "catalog/index.h"
 #include "access/sysattr.h"
@@ -60,7 +66,7 @@
  */
 
 static void
-genericcostestimate(PlannerInfo *root,
+bingo_genericcostestimate(PlannerInfo *root,
 					IndexOptInfo *index, List *indexQuals,
 					RelOptInfo *outer_rel,
 					double numIndexTuples,
@@ -107,8 +113,11 @@ genericcostestimate(PlannerInfo *root,
 		{
 			Node	   *predQual = (Node *) lfirst(l);
 			List	   *oneQual = list_make1(predQual);
-
-			if (!predicate_implied_by(oneQual, indexQuals))
+#if PG_VERSION_NUM / 100 >= 1000
+			if (!predicate_implied_by(oneQual, indexQuals,true))
+#else
+                        if (!predicate_implied_by(oneQual, indexQuals))
+#endif                            
 				predExtraQuals = list_concat(predExtraQuals, oneQual);
 		}
 		/* list_concat avoids modifying the passed-in indexQuals list */
@@ -330,8 +339,11 @@ add_predicate_to_quals(IndexOptInfo *index, List *indexQuals)
 	{
 		Node	   *predQual = (Node *) lfirst(lc);
 		List	   *oneQual = list_make1(predQual);
-
-		if (!predicate_implied_by(oneQual, indexQuals))
+#if PG_VERSION_NUM / 100 >= 1000
+		if (!predicate_implied_by(oneQual, indexQuals, true))
+#else
+                if (!predicate_implied_by(oneQual, indexQuals))
+#endif
 			predExtraQuals = list_concat(predExtraQuals, oneQual);
 	}
 	/* list_concat avoids modifying the passed-in indexQuals list */
@@ -568,7 +580,7 @@ genericcostestimate92(PlannerInfo *root,
 }
 #endif
 
-#if PG_VERSION_NUM / 100 == 904
+#if PG_VERSION_NUM / 100 >= 904
 	PGDLLEXPORT PG_FUNCTION_INFO_V1(bingo_costestimate);
 #else
 	PG_FUNCTION_INFO_V1(bingo_costestimate);
@@ -616,7 +628,7 @@ bingo_costestimate(PG_FUNCTION_ARGS) {
 */
 
 
-   genericcostestimate(root, index, indexQuals, outer_rel, 1.0,
+   bingo_genericcostestimate(root, index, indexQuals, outer_rel, 1.0,
    					indexStartupCost, indexTotalCost,
    					indexSelectivity, indexCorrelation);
 #endif
@@ -660,7 +672,37 @@ bingo_costestimate(PG_FUNCTION_ARGS) {
    PG_RETURN_VOID();
 }
 
+void bingo_costestimate96 ( struct PlannerInfo *root,
+                            struct IndexPath *path,
+                            double loop_count,
+                            Cost *indexStartupCost,
+                            Cost *indexTotalCost,
+                            Selectivity *indexSelectivity,
+                            double *indexCorrelation) {
+    genericcostestimate92(root, path, loop_count, 1.0,
+						indexStartupCost, indexTotalCost,
+						indexSelectivity, indexCorrelation);
+    
+}
 
+
+
+void bingo_costestimate101 (struct PlannerInfo *root,
+										 struct IndexPath *path,
+										 double loop_count,
+										 Cost *indexStartupCost,
+										 Cost *indexTotalCost,
+										 Selectivity *indexSelectivity,
+										 double *indexCorrelation,
+										 double *indexPages){
+    
+    genericcostestimate92(root, path, loop_count, 1.0,
+						indexStartupCost, indexTotalCost,
+						indexSelectivity, indexCorrelation);
+    
+    *indexPages = 1;
+    
+}
 /*
 Datum
 bingo_costestimate(PG_FUNCTION_ARGS) {
@@ -700,4 +742,4 @@ bingo_costestimate(PG_FUNCTION_ARGS) {
 */
 
 //Node	   *newNodeMacroHolder;
-char	   *BufferBlocks;
+//char	   *BufferBlocks;

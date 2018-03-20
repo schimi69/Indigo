@@ -51,6 +51,8 @@ public:
    bool ignore_noncritical_query_features;
    bool treat_x_as_pseudoatom;
    bool skip_3d_chirality;
+   bool ignore_no_chiral_flag;
+   bool ignore_bad_valence;
 
    // Loaded properties
    CP_DECL;
@@ -59,6 +61,7 @@ public:
    DECL_ERROR;
 
    static bool tryMDLCT (Scanner &scanner, Array<char> &outbuf);
+   static void readAllDataToString(Scanner & scanner, Array<char> &dataBuf);
 
 protected:
    Scanner *_scanner;

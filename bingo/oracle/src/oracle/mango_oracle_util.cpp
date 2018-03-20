@@ -36,6 +36,7 @@
 #include "molecule/elements.h"
 
 #include "molecule/inchi_wrapper.h"
+#include "base_cpp/cancellation_handler.h"
 
 static void _mangoUpdateMolecule(Molecule &target, const char *options, BingoOracleContext &context)
 {
@@ -65,6 +66,11 @@ static OCIString * _mangoSMILES (OracleEnv &env, const Array<char> &target_buf, 
    profTimerStop(tload);
 
    _mangoUpdateMolecule(target, options, context);
+   AutoPtr<CancellationHandler> handler(nullptr);
+   if(context.timeout > 0 ) {
+      handler.reset(new TimeoutCancellationHandler(context.timeout));
+   }
+   AutoCancellationHandler auto_handler(handler.release());
 
    if (canonical)
       MoleculeAromatizer::aromatizeBonds(target, AromaticityOptions::BASIC);
@@ -109,12 +115,10 @@ ORAEXT OCIString * oraMangoSMILES (OCIExtProcContext *ctx,
 {
    OCIString *result = NULL;
 
-   logger.initIfClosed(log_filename);
-
-   ORABLOCK_BEGIN
+   ORA_SAFEBLOCK_BEGIN("smiles")
    {
       OracleEnv env(ctx, logger);
-
+      
       *return_indicator = OCI_IND_NULL;
 
       if (options_ind != OCI_IND_NOTNULL)
@@ -123,6 +127,7 @@ ORAEXT OCIString * oraMangoSMILES (OCIExtProcContext *ctx,
       if (target_indicator == OCI_IND_NOTNULL)
       {
          BingoOracleContext &context = BingoOracleContext::get(env, 0, false, 0);
+         block_throw_error = context.reject_invalid_structures.get();
 
          OracleLOB target_lob(env, target_locator);
 
@@ -141,7 +146,7 @@ ORAEXT OCIString * oraMangoSMILES (OCIExtProcContext *ctx,
       else
          *return_indicator = OCI_IND_NOTNULL;
    }
-   ORABLOCK_END
+   ORA_SAFEBLOCK_END
 
    return result;
 }
@@ -155,9 +160,7 @@ ORAEXT OCIString *oraMangoCanonicalSMILES (OCIExtProcContext *ctx,
 
    OCIString *result = NULL;
 
-   logger.initIfClosed(log_filename);
-
-   ORABLOCK_BEGIN
+   ORA_SAFEBLOCK_BEGIN("canonicalSmiles")
    {
       OracleEnv env(ctx, logger);
 
@@ -166,6 +169,7 @@ ORAEXT OCIString *oraMangoCanonicalSMILES (OCIExtProcContext *ctx,
       if (target_indicator == OCI_IND_NOTNULL)
       {
          BingoOracleContext &context = BingoOracleContext::get(env, 0, false, 0);
+         block_throw_error = context.reject_invalid_structures.get();
 
          OracleLOB target_lob(env, target_locator);
 
@@ -186,7 +190,7 @@ ORAEXT OCIString *oraMangoCanonicalSMILES (OCIExtProcContext *ctx,
       else
          *return_indicator = OCI_IND_NOTNULL;
    }
-   ORABLOCK_END
+   ORA_SAFEBLOCK_END
 
    return result;
 }
@@ -282,7 +286,7 @@ ORAEXT OCILobLocator *oraMangoICM (OCIExtProcContext *ctx,
 {
    OCILobLocator *result = 0;
 
-   ORABLOCK_BEGIN
+   ORA_SAFEBLOCK_BEGIN("ICM")
    {
       *return_indicator = OCI_IND_NULL;
 
@@ -292,6 +296,7 @@ ORAEXT OCILobLocator *oraMangoICM (OCIExtProcContext *ctx,
       {
          OracleLOB target_lob(env, target_locator);
          BingoOracleContext &context = BingoOracleContext::get(env, 0, false, 0);
+         block_throw_error = context.reject_invalid_structures.get();
 
          QS_DEF(Array<char>, icm);
 
@@ -306,7 +311,7 @@ ORAEXT OCILobLocator *oraMangoICM (OCIExtProcContext *ctx,
          *return_indicator = OCI_IND_NOTNULL;
       }
    }
-   ORABLOCK_END
+   ORA_SAFEBLOCK_END
 
    return result;
 }
@@ -316,7 +321,7 @@ ORAEXT void oraMangoICM2 (OCIExtProcContext *ctx,
                           OCILobLocator *result_locator, short result_indicator,
                           int save_xyz)
 {
-   ORABLOCK_BEGIN
+   ORA_SAFEBLOCK_BEGIN("ICM2")
    {
       OracleEnv env(ctx, logger);
 
@@ -327,6 +332,8 @@ ORAEXT void oraMangoICM2 (OCIExtProcContext *ctx,
 
       OracleLOB target_lob(env, target_locator);
       BingoOracleContext &context = BingoOracleContext::get(env, 0, false, 0);
+      block_throw_error = context.reject_invalid_structures.get();
+      
       QS_DEF(Array<char>, icm);
 
       _ICM(context, target_lob, save_xyz, icm);
@@ -336,7 +343,7 @@ ORAEXT void oraMangoICM2 (OCIExtProcContext *ctx,
       result_lob.write(0, icm);
       result_lob.trim(icm.size());
    }
-   ORABLOCK_END
+   ORA_SAFEBLOCK_END
 }
 
 ORAEXT OCILobLocator *oraMangoMolfile (OCIExtProcContext *ctx,
@@ -346,7 +353,7 @@ ORAEXT OCILobLocator *oraMangoMolfile (OCIExtProcContext *ctx,
 {
    OCILobLocator *result = 0;
 
-   ORABLOCK_BEGIN
+   ORA_SAFEBLOCK_BEGIN("molfile")
    {
       *return_indicator = OCI_IND_NULL;
 
@@ -358,6 +365,7 @@ ORAEXT OCILobLocator *oraMangoMolfile (OCIExtProcContext *ctx,
       if (target_indicator == OCI_IND_NOTNULL)
       {
          BingoOracleContext &context = BingoOracleContext::get(env, 0, false, 0);
+         block_throw_error = context.reject_invalid_structures.get();
          OracleLOB target_lob(env, target_locator);
 
          QS_DEF(Array<char>, target);
@@ -396,7 +404,7 @@ ORAEXT OCILobLocator *oraMangoMolfile (OCIExtProcContext *ctx,
          *return_indicator = OCI_IND_NOTNULL;
       }
    }
-   ORABLOCK_END
+   ORA_SAFEBLOCK_END
 
    return result;
 }
@@ -407,7 +415,7 @@ ORAEXT OCILobLocator *oraMangoCML (OCIExtProcContext *ctx,
 {
    OCILobLocator *result = 0;
 
-   ORABLOCK_BEGIN
+   ORA_SAFEBLOCK_BEGIN("cml")
    {
       *return_indicator = OCI_IND_NULL;
 
@@ -416,6 +424,7 @@ ORAEXT OCILobLocator *oraMangoCML (OCIExtProcContext *ctx,
       if (target_indicator == OCI_IND_NOTNULL)
       {
          BingoOracleContext &context = BingoOracleContext::get(env, 0, false, 0);
+         block_throw_error = context.reject_invalid_structures.get();
          OracleLOB target_lob(env, target_locator);
 
          QS_DEF(Array<char>, target);
@@ -452,7 +461,7 @@ ORAEXT OCILobLocator *oraMangoCML (OCIExtProcContext *ctx,
          *return_indicator = OCI_IND_NOTNULL;
       }
    }
-   ORABLOCK_END
+   ORA_SAFEBLOCK_END
 
    return result;
 }
@@ -465,7 +474,7 @@ ORAEXT OCILobLocator * oraMangoInchi (OCIExtProcContext *ctx,
 {
    OCILobLocator *result = NULL;
 
-   ORABLOCK_BEGIN
+   ORA_SAFEBLOCK_BEGIN("inchi")
    {
       *return_ind = OCI_IND_NULL;
 
@@ -477,6 +486,7 @@ ORAEXT OCILobLocator * oraMangoInchi (OCIExtProcContext *ctx,
       if (target_ind == OCI_IND_NOTNULL)
       {
          BingoOracleContext &context = BingoOracleContext::get(env, 0, false, 0);
+         block_throw_error = context.reject_invalid_structures.get();
 
          QS_DEF(Array<char>, target_buf);
 
@@ -507,7 +517,7 @@ ORAEXT OCILobLocator * oraMangoInchi (OCIExtProcContext *ctx,
          *return_ind = OCI_IND_NOTNULL;
       }
    }
-   ORABLOCK_END
+   ORA_SAFEBLOCK_END
 
    return result;
 }
@@ -518,7 +528,7 @@ ORAEXT OCIString * oraMangoInchiKey (OCIExtProcContext *ctx,
 {
    OCIString *result = NULL;
 
-   ORABLOCK_BEGIN
+   ORA_SAFEBLOCK_BEGIN("inchikey")
    {
       *return_ind = OCI_IND_NULL;
 
@@ -527,6 +537,7 @@ ORAEXT OCIString * oraMangoInchiKey (OCIExtProcContext *ctx,
       if (inchi_ind == OCI_IND_NOTNULL)
       {
          BingoOracleContext &context = BingoOracleContext::get(env, 0, false, 0);
+         block_throw_error = context.reject_invalid_structures.get();
 
          QS_DEF(Array<char>, inchi);
          OracleLOB inchi_lob(env, inchi_loc); 
@@ -543,7 +554,7 @@ ORAEXT OCIString * oraMangoInchiKey (OCIExtProcContext *ctx,
       if (result != 0)
          *return_ind = OCI_IND_NOTNULL;
    }
-   ORABLOCK_END
+   ORA_SAFEBLOCK_END
 
    return result;
 }
@@ -555,7 +566,7 @@ ORAEXT OCILobLocator * oraMangoFingerprint (OCIExtProcContext *ctx,
 {
    OCILobLocator *result = NULL;
 
-   ORABLOCK_BEGIN
+   ORA_SAFEBLOCK_BEGIN("fingerprint")
    {
       *return_ind = OCI_IND_NULL;
 
@@ -567,6 +578,7 @@ ORAEXT OCILobLocator * oraMangoFingerprint (OCIExtProcContext *ctx,
       if (target_ind == OCI_IND_NOTNULL)
       {
          BingoOracleContext &context = BingoOracleContext::get(env, 0, false, 0);
+         block_throw_error = context.reject_invalid_structures.get();
 
          QS_DEF(Array<char>, target_buf);
 
@@ -598,7 +610,7 @@ ORAEXT OCILobLocator * oraMangoFingerprint (OCIExtProcContext *ctx,
          *return_ind = OCI_IND_NOTNULL;
       }
    }
-   ORABLOCK_END
+   ORA_SAFEBLOCK_END
 
    return result;
 }

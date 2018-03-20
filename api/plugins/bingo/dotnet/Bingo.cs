@@ -200,6 +200,31 @@ namespace com.epam.indigo
         }
 
         /// <summary>
+        /// Insert a structure into the database and returns id of this structure
+        /// </summary>
+        /// <param name="record">Indigo object with a chemical structure (molecule or reaction)</param>
+        /// <param name="ext_fp">Indigo object with a external similarity fingerprint</param>
+        /// <returns>record id</returns>
+        public int insertWithExtFP(IndigoObject record, IndigoObject ext_fp)
+        {
+           _indigo.setSessionID();
+           return Bingo.checkResult(_indigo, _lib.bingoInsertRecordObjWithExtFP(_id, record.self, ext_fp.self));
+        }
+
+        /// <summary>
+        /// Inserts a structure under a specified id
+        /// </summary>
+        /// <param name="record">Indigo object with a chemical structure (molecule or reaction)</param>
+        /// <param name="ext_fp">Indigo object with a external similarity fingerprint</param>
+        /// <param name="id">record id</param>
+        /// <returns> inserted record id</returns>
+        public int insertWithExtFP(IndigoObject record, IndigoObject ext_fp, int id)
+        {
+           _indigo.setSessionID();
+           return Bingo.checkResult(_indigo, _lib.bingoInsertRecordObjWithIdAndExtFP(_id, record.self, id, ext_fp.self));
+        }
+
+        /// <summary>
         /// Delete a record by id
         /// </summary>
         /// <param name="id">Record id</param>
@@ -264,6 +289,91 @@ namespace com.epam.indigo
         {
             return searchSim(query, min, max, null);
         }
+
+        /// <summary>
+        /// Execute similarity search operation
+        /// </summary>
+        /// <param name="query">indigo object (molecule or reaction)</param>
+        /// <param name="min">Minimum similarity value</param>
+        /// <param name="max">Maximum similairy value</param>
+        /// <param name="ext_fp">Indigo object with a external similarity fingerprint</param>
+        /// <param name="metric">Default value is "tanimoto"</param>
+        /// <returns>Bingo search object instance</returns>
+        public BingoObject searchSimWithExtFP(IndigoObject query, float min, float max, IndigoObject ext_fp, string metric)
+        {
+            if (metric == null)
+            {
+                metric = "tanimoto";
+            }
+            _indigo.setSessionID();
+            return new BingoObject(Bingo.checkResult(_indigo, _lib.bingoSearchSimWithExtFP(_id, query.self, min, max, ext_fp.self, metric)), _indigo, _lib);
+        }
+
+        /// <summary>
+        /// Execute similarity search for most similar structures (defined by limit)
+        /// </summary>
+        /// <param name="query"> indigo object (molecule or reaction)</param>
+        /// <param name="limit"> Number of structures</param>
+        /// <param name="minSim"> Minimum similarity value</param>
+        /// <param name="metric"> Default value is "tanimoto"</param>
+        /// <returns> Bingo search object instance</returns>
+
+        public BingoObject searchSimTopN(IndigoObject query, int limit, float minSim, String metric)
+        {
+            if (metric == null)
+            {
+                metric = "tanimoto";
+            }
+            _indigo.setSessionID();
+            return new BingoObject(Bingo.checkResult(_indigo, _lib.bingoSearchSimTopN(_id, query.self, limit, minSim, metric)), _indigo, _lib);
+        }
+        /// <summary>
+        /// Execute similarity search for most similar structures (defined by limit)
+        /// </summary>
+        /// <param name="query"> indigo object (molecule or reaction)</param>
+		/// <param name="limit"> Number of structures</param>
+		/// <param name="minSim"> Minimum similarity value</param>
+		/// <returns>Bingo search object instance</returns>
+
+        public BingoObject searchSimTopN(IndigoObject query, int limit, float minSim)
+        {
+            return searchSimTopN(query, limit, minSim, null);
+        }
+
+        /// <summary>
+        /// Execute similarity search for most similar structures with external fingerprint
+        /// </summary>
+        /// <param name="query"> indigo object (molecule or reaction)</param>
+        /// <param name="limit"> Number of structures</param>
+        /// <param name="minSim"> Minimum similarity value</param>
+        /// <param name="metric"> Default value is "tanimoto"</param>
+        /// <param name="extFp"> Indigo object with a external similarity fingerprint (molecule or reaction)</param>
+        /// <returns> Bingo search object instance</returns>
+
+        public BingoObject searchSimTopNWithExtFP(IndigoObject query, int limit, float minSim, IndigoObject extFp, String metric)
+        {
+            if (metric == null)
+            {
+                metric = "tanimoto";
+            }
+            _indigo.setSessionID();
+            return new BingoObject(Bingo.checkResult(_indigo, _lib.bingoSearchSimTopNWithExtFP(_id, query.self, limit, minSim, extFp.self, metric)), _indigo, _lib);
+        }
+
+        /// <summary>
+        /// Execute similarity search for most similar structures with external fingerprint
+        /// </summary>
+        /// <param name="query"> indigo object (molecule or reaction)</param>
+        /// <param name="limit"> Number of structures</param>
+        /// <param name="minSim"> Minimum similarity value</param>
+        /// <param name="extFp"> Indigo object with a external similarity fingerprint (molecule or reaction)</param>
+        /// <returns> Bingo search object instance</returns>
+
+        public BingoObject searchSimTopNWithExtFP(IndigoObject query, int limit, float minSim, IndigoObject extFp)
+        {
+            return searchSimTopNWithExtFP(query, limit, minSim, extFp, null);
+        }
+
 
         /// <summary>
         /// Execute enumerate id operation

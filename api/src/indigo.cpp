@@ -12,6 +12,7 @@
  * WARRANTY OF DESIGN, MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE.
  ***************************************************************************/
 
+#include "locale.h"
 #include "indigo_internal.h"
 
 #include "base_cpp/output.h"
@@ -37,10 +38,10 @@ void Indigo::init ()
 {
    error_handler = 0;
    error_handler_context = 0;
-   _next_id = 1001;
 
    stereochemistry_options.reset();
    ignore_noncritical_query_features = false;
+   ignore_no_chiral_flag = false;
    treat_x_as_pseudoatom = false;
    skip_3d_chirality = false;
    deconvolution_aromatization = true;
@@ -54,6 +55,7 @@ void Indigo::init ()
    fp_params.tau_qwords = 10;
    fp_params.ord_qwords = 25;
    fp_params.ext = true;
+   fp_params.similarity_type = SimilarityType::SIM;
 
    embedding_edges_uniqueness = false;
    find_unique_embeddings = true;
@@ -79,6 +81,11 @@ void Indigo::init ()
 
    arom_options = AromaticityOptions();
 
+   scsr_ignore_chem_templates = false;
+
+   ignore_closing_bond_direction_mismatch = false;
+   ignore_bad_valence = false;
+
    // Update global index
    static ThreadSafeStaticObj<OsLock> lock;
    {
@@ -90,7 +97,7 @@ void Indigo::init ()
 }
 
 
-Indigo::Indigo ()
+Indigo::Indigo (): _next_id(1001)
 {
    init();
 }
@@ -149,7 +156,7 @@ CEXPORT qword indigoAllocSessionId ()
    qword id = TL_ALLOC_SESSION_ID();
    Indigo &indigo = indigo_self.getLocalCopy(id);
    indigo.init();
-
+   setlocale(LC_NUMERIC, "C");
    return id;
 }
 

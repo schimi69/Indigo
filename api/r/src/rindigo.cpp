@@ -202,6 +202,7 @@ REXPORT void setFingerprintParams()
    indigoSetOptionInt("fp-any-qwords", 15);
    indigoSetOptionInt("fp-tau-qwords", 0);
    indigoSetOptionInt("fp-ext-enabled", 0);
+   indigoSetOption("similarity-type", "SIM");
 }
    
 REXPORT SEXP aromatize(SEXP mol)

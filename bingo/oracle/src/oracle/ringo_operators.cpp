@@ -27,6 +27,9 @@
 #include "molecule/cmf_saver.h"
 #include "reaction/crf_saver.h"
 #include "molecule/elements.h"
+#include "molecule/molecule_pi_systems_matcher.h"
+#include "molecule/molecule_auto_loader.h"
+#include "graph/embedding_enumerator.h"
 
 static OCINumber * _ringoSub (OracleEnv &env, RingoOracleContext &context,
                               const Array<char> &query_buf,

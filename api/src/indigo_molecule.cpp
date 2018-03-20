@@ -33,6 +33,7 @@
 #include "molecule/molecule_name_parser.h"
 #include "molecule/molecule_savers.h"
 
+
 IndigoBaseMolecule::IndigoBaseMolecule (int type_) : IndigoObject(type_)
 {
 }
@@ -474,6 +475,9 @@ CEXPORT int indigoLoadMolecule (int source)
       loader.treat_x_as_pseudoatom = self.treat_x_as_pseudoatom;
       loader.ignore_noncritical_query_features = self.ignore_noncritical_query_features;
       loader.skip_3d_chirality = self.skip_3d_chirality;
+      loader.ignore_closing_bond_direction_mismatch = self.ignore_closing_bond_direction_mismatch;
+      loader.ignore_no_chiral_flag = self.ignore_no_chiral_flag;
+      loader.ignore_bad_valence = self.ignore_bad_valence;
 
       AutoPtr<IndigoMolecule> molptr(new IndigoMolecule());
 
@@ -524,6 +528,98 @@ CEXPORT int indigoLoadSmarts (int source)
       return self.addObject(molptr.release());
    }
    INDIGO_END(-1);
+}
+
+static bool isReacton(const char *string)
+{
+    auto isIn = [](const char *source, const char *pattern)->bool
+    {
+        return std::string(source).find(pattern) != std::string::npos;
+    };
+    
+    auto startWith = [](const char *source, const char *pattern)->bool
+    {
+        return strncmp(source, pattern, strlen(pattern))==0;
+    };
+    
+    return isIn(string, ">>") || startWith(string, "$RXN") || isIn(string, "<reactantList>");
+}
+
+CEXPORT int indigoLoadStructureFromString(const char *string, const char * params)
+{
+    INDIGO_BEGIN
+    {
+        if (strncmp(string, "InChI", strlen("InChI")) == 0)
+        {
+            return indigoLoadMoleculeFromString(string);
+        }
+
+        const std::string strParams(params ? params : "");
+        bool isQuery  = (strParams.find("query") != std::string::npos) ? true : false;
+        bool isSmarts = (strParams.find("smarts") != std::string::npos) ? true : false;
+        bool isReaction = isReacton(string);
+
+        if (isSmarts)
+        {
+            if (isReaction)
+                return indigoLoadReactionSmartsFromString(string);
+            else
+                return indigoLoadSmartsFromString(string);
+        }
+
+        if (isQuery)
+        {
+            if (isReaction)
+                return indigoLoadQueryReactionFromString(string);
+            else
+                return indigoLoadQueryMoleculeFromString(string);
+        }
+
+        try
+        {
+            if (isReaction)
+                return indigoLoadReactionFromString(string);
+            else
+                return indigoLoadMoleculeFromString(string);
+        }
+        catch (Exception& e)
+        {
+            if (std::string(e.message()).find("query") == std::string::npos
+                && std::string(e.message()).find("queries") == std::string::npos)
+            {
+                throw e;
+            }
+
+            if (isReaction)
+                return indigoLoadQueryReactionFromString(string);
+            else
+                return indigoLoadQueryMoleculeFromString(string);
+        }
+
+    }
+    INDIGO_END(-1);
+}
+
+CEXPORT int indigoLoadStructureFromBuffer(const byte *buff, int bufferSize, const char * params)
+{
+    BufferScanner scanner(buff, bufferSize);
+    Array<char> arr;
+    MoleculeAutoLoader::readAllDataToString(scanner, arr);
+
+    return indigoLoadStructureFromString(arr.ptr(), params);
+}
+
+CEXPORT int indigoLoadStructureFromFile(const char *filename, const char * params)
+{
+    INDIGO_BEGIN
+    {
+        FileScanner scanner(self.filename_encoding, filename);
+        Array<char> arr;
+        MoleculeAutoLoader::readAllDataToString(scanner, arr);
+
+        return indigoLoadStructureFromString(arr.ptr(), params);
+    }
+    INDIGO_END(-1);
 }
 
 IndigoMoleculeComponent::IndigoMoleculeComponent (BaseMolecule &mol_, int index_) :
@@ -1220,42 +1316,6 @@ CEXPORT int indigoCheckValence (int atom)
    INDIGO_END(-1);
 }
 
-CEXPORT int indigoCheckQuery (int item)
-{
-   INDIGO_BEGIN
-   {
-      IndigoObject &obj = self.getObject(item);
-
-      if (IndigoAtom::is(obj))
-      {
-         IndigoAtom &ia = IndigoAtom::cast(obj);
-
-         if ( (ia.mol.reaction_atom_exact_change[ia.idx] != 0) ||
-              (ia.mol.reaction_atom_inversion[ia.idx] != 0) )
-            return 1;
-
-         if (ia.mol.isQueryMolecule())
-         {
-            return 1;
-         } 
-      }
-      else if (IndigoBond::is(obj))
-      {
-         IndigoBond &ib = IndigoBond::cast(obj);
-
-         if (ib.mol.reaction_bond_reacting_center[ib.idx] != 0) 
-            return 1;
-
-         if (ib.mol.isQueryMolecule())
-         {
-            return 1;
-         }
-      }
-      return 0;
-   }
-   INDIGO_END(-1);
-}
-
 CEXPORT int indigoGetExplicitValence (int atom, int *valence)
 {
    INDIGO_BEGIN
@@ -1830,7 +1890,7 @@ CEXPORT int indigoIsChiral (int molecule)
    INDIGO_BEGIN
    {
       BaseMolecule &mol = self.getObject(molecule).getBaseMolecule();
-      return mol.isChrial();
+      return mol.isChiral();
    }
    INDIGO_END(-1)
 }
@@ -3534,6 +3594,7 @@ CEXPORT int indigoTransformCTABtoSCSR (int molecule, int templates)
          tg.copy(temp.tgroups.getTGroup(i));
       }
 
+      mol.ignore_chem_templates = self.scsr_ignore_chem_templates;
       mol.transformFullCTABtoSCSR(tgs);
 
       return 1;

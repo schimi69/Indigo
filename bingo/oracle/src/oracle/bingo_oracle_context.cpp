@@ -116,6 +116,9 @@ void BingoOracleContext::_loadConfigParameters (OracleEnv &env)
    configGetIntDef(env, "REJECT_INVALID_STRUCTURES", val, 0);
    reject_invalid_structures = (val != 0);
 
+   configGetIntDef(env, "IGNORE_BAD_VALENCE", val, 0);
+   ignore_bad_valence = (val != 0);
+
    QS_DEF(Array<char>, cmfdict);
    
    if (configGetBlob(env, "CMFDICT", cmfdict))
@@ -360,7 +363,7 @@ void BingoOracleContext::fingerprintLoadParameters (OracleEnv &env)
    configGetInt(env, "FP_ANY_SIZE", fp_parameters.any_qwords);
    fp_parameters.ext = true;
    fp_parameters_ready = true;
-   
+
    configGetInt(env, "FP_STORAGE_CHUNK", fp_chunk_qwords);
 }
 

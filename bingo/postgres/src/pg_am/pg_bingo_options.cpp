@@ -29,9 +29,12 @@ extern "C" {
 
 
 
+#if PG_VERSION_NUM / 100 < 906
 extern "C" {
 BINGO_FUNCTION_EXPORT(bingo_options);
 }
+#endif
+
 
 
 #define RELOPT_KIND_BINGO 1<<8
@@ -179,6 +182,13 @@ static relopt_int intRelOpts[] =
       }, -1, 0, 1
    },
    {
+      {
+         "ignore_bad_valence",
+         "",
+         RELOPT_KIND_BINGO
+      }, -1, 0, 1
+   },
+   {
 		{
 			"fp_ord_size",
 			"",
@@ -286,11 +296,19 @@ static relopt_real realRelOpts[] =
 	{{NULL}}
 };
 
-static relopt_string stringRelOpts[] =
-{
-	/* list terminator */
-	{{NULL}}
-};
+//static relopt_string stringRelOpts[] =
+//{
+//	{
+//		{
+//				"similarity_type",
+//				"",
+//				RELOPT_KIND_BINGO,
+//                                AccessExclusiveLock
+//		}, 3, false, nullptr, "SIM"
+//	},
+//	/* list terminator */
+//	{{NULL}}
+//};
 
 static relopt_gen **relOpts = NULL;
 
@@ -403,8 +421,8 @@ initialize_reloptions(void) {
       j++;
    for (i = 0; realRelOpts[i].gen.name; i++)
       j++;
-   for (i = 0; stringRelOpts[i].gen.name; i++)
-      j++;
+//   for (i = 0; stringRelOpts[i].gen.name; i++)
+//      j++;
    j += num_custom_options;
 
    if (relOpts)
@@ -434,12 +452,12 @@ initialize_reloptions(void) {
       j++;
    }
 
-   for (i = 0; stringRelOpts[i].gen.name; i++) {
-      relOpts[j] = &stringRelOpts[i].gen;
-      relOpts[j]->type = RELOPT_TYPE_STRING;
-      relOpts[j]->namelen = strlen(relOpts[j]->name);
-      j++;
-   }
+//   for (i = 0; stringRelOpts[i].gen.name; i++) {
+//      relOpts[j] = &stringRelOpts[i].gen;
+//      relOpts[j]->type = RELOPT_TYPE_STRING;
+//      relOpts[j]->namelen = strlen(relOpts[j]->name);
+//      j++;
+//   }
 
    for (i = 0; i < num_custom_options; i++) {
       relOpts[j] = custom_options[i];
@@ -581,6 +599,8 @@ bingo_reloptions(Datum reloptions, bool validate) {
               offsetof(BingoStdRdOptions, index_parameters) + offsetof(BingoIndexOptions, zero_unknown_aromatic_hydrogens)},
       {"reject_invalid_structures", RELOPT_TYPE_INT,
               offsetof(BingoStdRdOptions, index_parameters) + offsetof(BingoIndexOptions, reject_invalid_structures)},
+      {"ignore_bad_valence", RELOPT_TYPE_INT,
+              offsetof(BingoStdRdOptions, index_parameters) + offsetof(BingoIndexOptions, ignore_bad_valence)},
       {"fp_ord_size", RELOPT_TYPE_INT,
               offsetof(BingoStdRdOptions, index_parameters) + offsetof(BingoIndexOptions, fp_ord_size)},
       {"fp_any_size", RELOPT_TYPE_INT,
@@ -613,18 +633,26 @@ bingo_reloptions(Datum reloptions, bool validate) {
    return (bytea *) rdopts;
 }
 
+#if PG_VERSION_NUM / 100 >= 906
+CEXPORT bytea * bingo_options (Datum reloptions, bool validate) {
+#else
 Datum
 bingo_options(PG_FUNCTION_ARGS) {
    Datum reloptions = PG_GETARG_DATUM(0);
    bool validate = PG_GETARG_BOOL(1);
+#endif
+
 
    bytea *result;
 
    result = bingo_reloptions(reloptions, validate);
-
+#if PG_VERSION_NUM / 100 >= 906
+   return result;
+#else
   if (result)
       PG_RETURN_BYTEA_P(result);
    PG_RETURN_NULL();
+#endif
 }
 //Datum
 //bingo_options(PG_FUNCTION_ARGS) {

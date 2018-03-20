@@ -23,12 +23,15 @@
 #include "molecule/cmf_saver.h"
 #include "reaction/crf_saver.h"
 #include "molecule/molfile_loader.h"
+#include "molecule/molecule_auto_loader.h"
 #include "reaction/rxnfile_loader.h"
 #include "reaction/reaction_auto_loader.h"
 #include "oracle/rowid_saver.h"
 #include "molecule/elements.h"
 #include "base_cpp/auto_ptr.h"
 #include "oracle/ringo_fetch_context.h"
+#include "molecule/molecule_pi_systems_matcher.h"
+#include "graph/embedding_enumerator.h"
 
 bool _ringoRegisterReaction (OracleEnv &env, const char *rowid,
                              const Array<char> &reaction_buf,

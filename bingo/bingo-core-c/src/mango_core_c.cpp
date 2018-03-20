@@ -27,6 +27,8 @@
 #include "molecule/cml_saver.h"
 
 #include "molecule/inchi_wrapper.h"
+#include "molecule/molecule_standardize.h"
+#include "molecule/molecule_standardize_options.h"
 
 using namespace indigo::bingo_core;
 
@@ -402,7 +404,7 @@ CEXPORT int mangoMatchTargetBinary (const char *target_bin, int target_bin_len,
 {
    profTimerStart(t0, "match.match_target_binary");
 
-   BINGO_BEGIN
+   BINGO_BEGIN_TIMEOUT
    {
       if (self.mango_search_type == BingoCore::_UNDEF)
          throw BingoError("Undefined search type");
@@ -521,7 +523,7 @@ CEXPORT const char * mangoSMILES (const char *target_buf, int target_buf_len, in
 {
    profTimerStart(t0, "smiles");
 
-   BINGO_BEGIN
+   BINGO_BEGIN_TIMEOUT
    {
       _mangoCheckPseudoAndCBDM(self);
 
@@ -732,6 +734,37 @@ CEXPORT int mangoMass (const char *target_buf, int target_buf_len, const char *t
    BINGO_END(-1, -1)
 }
 
+CEXPORT int mangoMassD (const char *target_buf, int target_buf_len, const char *type, double *out)
+{
+   BINGO_BEGIN
+   {
+      _mangoCheckPseudoAndCBDM(self);
+
+      BufferScanner scanner(target_buf, target_buf_len);
+
+      QS_DEF(Molecule, target);
+
+      MoleculeAutoLoader loader(scanner);
+      self.bingo_context->setLoaderSettings(loader);
+      loader.skip_3d_chirality = true;
+      loader.loadMolecule(target);
+
+      MoleculeMass mass_calulator;
+      mass_calulator.relative_atomic_mass_map = &self.bingo_context->relative_atomic_mass_map;
+
+      if (type == 0 || strlen(type) == 0 || strcasecmp(type, "molecular-weight") == 0)
+         *out = mass_calulator.molecularWeight(target);
+      else if (strcasecmp(type, "most-abundant-mass") == 0)
+         *out = mass_calulator.mostAbundantMass(target);
+      else if (strcasecmp(type, "monoisotopic-mass") == 0)
+         *out = mass_calulator.monoisotopicMass(target);
+      else
+         throw BingoError("unknown mass specifier: %s", type);
+      return 1;
+   }
+   BINGO_END(-1, -1)
+}
+
 
 CEXPORT const char* mangoGross (const char *target_buf, int target_buf_len)
 {
@@ -902,3 +935,30 @@ CEXPORT const char* mangoInChIKey(const char* inchi)
    BINGO_END(0, 0)
 }
 
+CEXPORT const char * mangoStandardize (const char *molecule, int molecule_len, const char *options)
+{
+   BINGO_BEGIN
+   {
+      BufferScanner scanner(molecule, molecule_len);
+
+      QS_DEF(Molecule, target);
+
+      MoleculeAutoLoader loader(scanner);
+      self.bingo_context->setLoaderSettings(loader);
+      loader.loadMolecule(target);
+
+      StandardizeOptions st_options;
+      st_options.parseFromString(options);
+
+      MoleculeStandardizer::standardize(target, st_options);
+
+      ArrayOutput out(self.buffer);
+
+      MolfileSaver saver(out);
+
+      saver.saveMolecule(target);
+      out.writeByte(0);
+      return self.buffer.ptr();
+   }
+   BINGO_END(0, 0)
+}
