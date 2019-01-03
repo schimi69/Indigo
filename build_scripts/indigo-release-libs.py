@@ -38,9 +38,12 @@ def build_libs(cl_args):
     presets = {
         "win32-2013": ("Visual Studio 12", ""),
         "win32-2015": ("Visual Studio 14", ""),
+        "win32-2017": ("Visual Studio 15", ""),
         "win64-2013": ("Visual Studio 12 Win64", ""),
         "win64-2015": ("Visual Studio 14 Win64", ""),
-        "win32-mingw": ("MinGW Makefiles", ""),
+        "win64-2017": ("Visual Studio 15 Win64", ""),
+        "win32-mingw": ("MinGW Makefiles", "-DSUBSYSTEM_NAME=x86"),
+        "win64-mingw": ("MinGW Makefiles", "-DSUBSYSTEM_NAME=x64"),
         "linux32": ("Unix Makefiles", "-DSUBSYSTEM_NAME=x86"),
         "linux32-universal": ("Unix Makefiles", "-DSUBSYSTEM_NAME=x86"),
         "linux64": ("Unix Makefiles", "-DSUBSYSTEM_NAME=x64"),
@@ -79,6 +82,7 @@ def build_libs(cl_args):
         print("Unexpected arguments: %s" % (str(left_args)))
         exit()
 
+    auto_vs = False
     if args.preset:
         args.generator, args.params = presets[args.preset]
     else:
@@ -105,10 +109,6 @@ def build_libs(cl_args):
             print("Preset is no selected, continuing with empty generator and params...")
             args.generator, args.params = '', ''
 
-    # if not args.generator:
-    #     print("Generator must be specified")
-    #     exit()
-
     cur_dir = os.path.abspath(os.path.dirname(__file__))
     root = os.path.join(cur_dir, "..")
     project_dir = os.path.join(cur_dir, "indigo-all")
@@ -131,8 +131,8 @@ def build_libs(cl_args):
     if args.findcairo:
         args.params += ' -DUSE_SYSTEM_PIXMAN=TRUE'
 
-    if not args.withStatic:
-        args.params += ' -DNO_STATIC=TRUE'
+    if args.withStatic:
+        args.params += ' -DWITH_STATIC=TRUE'
 
     if args.preset and args.preset.find('universal') != -1:
         args.params += ' -DUNIVERSAL_BUILD=TRUE'
@@ -155,6 +155,8 @@ def build_libs(cl_args):
 
     environment_prefix = ''
     if args.preset and (args.preset.find('linux') != -1 and args.preset.find('universal') != -1):
+        if args.preset.find('32') != -1:
+            os.environ['LD_FLAGS'] = '{} }'.format(os.environ.get('LD_FLAGS', ''), '-m32')
         environment_prefix = 'CC=gcc CXX=g++'
     command = "%s cmake %s %s %s" % (environment_prefix, '-G \"%s\"' % args.generator if args.generator else '', args.params, project_dir)
     print(command)
@@ -168,7 +170,7 @@ def build_libs(cl_args):
         if ext == ".zip":
             os.remove(os.path.join(full_build_dir, f))
 
-    if args.generator.find("Unix Makefiles") != -1:
+    if args.generator in {"Unix Makefiles", 'MinGW Makefiles'}:
         make_args = ''
         if args.buildVerbose:
             make_args += ' VERBOSE=1'
@@ -176,24 +178,21 @@ def build_libs(cl_args):
         if args.mtbuild:
             make_args += ' -j{} '.format(get_cpu_count())
 
-        check_call("make package %s" % (make_args), shell=True)
-        check_call("make install", shell=True)
-    elif args.generator.find("Xcode") != -1:
+        make_command = 'mingw32-make' if args.generator == 'MinGW Makefiles' else 'make'
+        check_call("%s package %s" % (make_command, make_args), shell=True)
+        check_call("%s install" % (make_command), shell=True)
+    elif args.generator == "Xcode":
         check_call("cmake --build . --target package --config %s" % (args.config), shell=True)
         check_call("cmake --build . --target install --config %s" % (args.config), shell=True)
-    elif args.generator.find("Visual Studio") != -1 or auto_vs:
+    elif args.generator.startswith("Visual Studio") or auto_vs:
         vsenv = os.environ
         if args.mtbuild:
             vsenv = dict(os.environ, CL='/MP')
         check_call("cmake --build . --target PACKAGE --config %s" % (args.config), env=vsenv, shell=True)
         check_call("cmake --build . --target INSTALL --config %s" % (args.config), shell=True)
-    elif args.generator.find("MinGW Makefiles") != -1:
-        check_call("mingw32-make package", shell=True)
-        check_call("mingw32-make install", shell=True)
     else:
         print("Do not know how to run package and install target")
     check_call("ctest -V --timeout 60 -C %s ." % (args.config), shell=True)
-
     os.chdir(root)
     if not os.path.exists("dist"):
         os.mkdir("dist")

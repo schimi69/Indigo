@@ -89,6 +89,8 @@ public interface IndigoLib extends Library
    int indigoSaveCmlToFile (int object, String filename);
    Pointer indigoCml (int object);
 
+   Pointer indigoJson (int object);
+
    int indigoSaveCdxml (int object, int output);
    int indigoSaveCdxmlToFile (int object, String filename);
    Pointer indigoCdxml (int object);
@@ -187,6 +189,10 @@ public interface IndigoLib extends Library
    int indigoCheckStereo (int item);
    int indigoCountHydrogens (int atom, IntByReference valence);
    int indigoCountImplicitHydrogens (int item);
+
+   Pointer indigoCheck (int item, String type);
+
+   Pointer indigoCheckStructure (String structure, String type);
 
    int indigoGetReactingCenter (int reaction, int reaction_bond, IntByReference rc);
    int indigoSetReactingCenter (int reaction, int reaction_bond, int rc);

@@ -17,7 +17,7 @@ include_directories(${Bingo_SOURCE_DIR}
 include(DefineTest)
 
 # Bingo static
-if (NOT NO_STATIC)
+if (WITH_STATIC)
 	add_library(bingo STATIC ${Bingo_src} ${Bingo_headers})
 	if(UNIX AND NOT APPLE)
 		SET_TARGET_PROPERTIES(bingo PROPERTIES LINK_FLAGS -Wl,--version-script=${CMAKE_CURRENT_SOURCE_DIR}/bingo.so.map)
@@ -39,6 +39,9 @@ endif()
 
 # Bingo shared
 add_library(bingo-shared SHARED ${Bingo_src} ${Bingo_headers} ${Common_SOURCE_DIR}/hacks/memcpy.c)
+if (MSVC OR MINGW)
+	set_target_properties(bingo-shared PROPERTIES PREFIX "")
+endif()
 if (UNIX AND NOT APPLE)
 	if(${SUBSYSTEM_NAME} MATCHES "x64")
 		set(LINK_FLAGS "${LINK_FLAGS} -Wl,--wrap=memcpy")

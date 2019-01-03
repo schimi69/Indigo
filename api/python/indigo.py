@@ -117,6 +117,12 @@ class IndigoObject(object):
         self.dispatcher._setSessionId()
         return self.dispatcher.IndigoObject(self.dispatcher, self.dispatcher._checkResult(Indigo._lib.indigoClone(self.id)))
 
+    def check(self, props=''):
+        if props is None:
+            props = ''
+        self.dispatcher._setSessionId()
+        return self.dispatcher._checkResultString(Indigo._lib.indigoCheck(self.id, props.encode(ENCODE_ENCODING)))
+
     def close(self):
         self.dispatcher._setSessionId()
         return self.dispatcher._checkResult(Indigo._lib.indigoClose(self.id))
@@ -156,6 +162,10 @@ class IndigoObject(object):
     def cdxml(self):
         self.dispatcher._setSessionId()
         return self.dispatcher._checkResultString(Indigo._lib.indigoCdxml(self.id))
+
+    def json(self):
+        self.dispatcher._setSessionId()
+        return self.dispatcher._checkResultString(Indigo._lib.indigoJson(self.id))
 
     def saveMDLCT(self, output):
         self.dispatcher._setSessionId()
@@ -1660,6 +1670,10 @@ class Indigo(object):
         Indigo._lib.indigoDbgBreakpoint.argtypes = None
         Indigo._lib.indigoClone.restype = c_int
         Indigo._lib.indigoClone.argtypes = [c_int]
+        Indigo._lib.indigoCheck.restype = c_char_p
+        Indigo._lib.indigoCheck.argtypes = [c_int, c_char_p]
+        Indigo._lib.indigoCheckStructure.restype = c_char_p
+        Indigo._lib.indigoCheckStructure.argtypes = [c_char_p, c_char_p]
         Indigo._lib.indigoClose.restype = c_int
         Indigo._lib.indigoClose.argtypes = [c_int]
         Indigo._lib.indigoNext.restype = c_int
@@ -1682,6 +1696,8 @@ class Indigo(object):
         Indigo._lib.indigoSaveCdxmlToFile.argtypes = [c_int, c_char_p]
         Indigo._lib.indigoCdxml.restype = c_char_p
         Indigo._lib.indigoCdxml.argtypes = [c_int]
+        Indigo._lib.indigoJson.restype = c_char_p
+        Indigo._lib.indigoJson.argtypes = [c_int]
         Indigo._lib.indigoSaveMDLCT.restype = c_int
         Indigo._lib.indigoSaveMDLCT.argtypes = [c_int, c_int]
         Indigo._lib.indigoAddReactant.restype = c_int
@@ -2448,14 +2464,14 @@ class Indigo(object):
         self._setSessionId()
         return self.IndigoObject(self, self._checkResult(Indigo._lib.indigoLoadReactionSmartsFromFile(filename.encode(ENCODE_ENCODING))))
 
-    def loadStructure(self, structureStr, parameter = None):
+    def loadStructure(self, structureStr, parameter=None):
         self._setSessionId()
-        parameter = '' if parameter is None else parameter 
+        parameter = '' if parameter is None else parameter
         return self.IndigoObject(self, 
                                  self._checkResult(Indigo._lib.indigoLoadStructureFromString(structureStr.encode(ENCODE_ENCODING),
-                                                                                             parameter)))
+                                                                                             parameter.encode(ENCODE_ENCODING))))
         
-    def loadStructureFromBuffer(self, structureData, parameter = None):
+    def loadStructureFromBuffer(self, structureData, parameter=None):
         if sys.version_info[0] < 3:
             buf = map(ord, structureData)
         else:
@@ -2464,12 +2480,20 @@ class Indigo(object):
         for i in range(len(buf)):
             values[i] = buf[i]
         self._setSessionId()
-        return self.IndigoObject(self, self._checkResult(Indigo._lib.indigoLoadStructureFromBuffer(values, len(buf), parameter)))
+        parameter = '' if parameter is None else parameter
+        return self.IndigoObject(self, self._checkResult(Indigo._lib.indigoLoadStructureFromBuffer(values, len(buf), parameter.encode(ENCODE_ENCODING))))
     
-    def loadStructureFromFile(self, filename, parameter = None):
+    def loadStructureFromFile(self, filename, parameter=None):
         self._setSessionId()
+        parameter = '' if parameter is None else parameter
         return self.IndigoObject(self, self._checkResult(Indigo._lib.indigoLoadStructureFromFile(filename.encode(ENCODE_ENCODING), 
-                                                                                                 parameter)))
+                                                                                                 parameter.encode(ENCODE_ENCODING))))
+
+    def checkStructure(self, structure, props=''):
+        if props is None:
+            props = ''
+        self._setSessionId()
+        return self._checkResultString(Indigo._lib.indigoCheckStructure(structure.encode(ENCODE_ENCODING), props.encode(ENCODE_ENCODING)))
 
     def loadFingerprintFromBuffer(self, buffer):
         """ Creates a fingerprint from the supplied binary data

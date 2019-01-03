@@ -90,6 +90,12 @@ public class IndigoObject implements Iterator<IndigoObject>, Iterable<IndigoObje
       return Indigo.checkResultString(this, _lib.indigoCml(self));
    }
 
+   public String json ()
+   {
+      dispatcher.setSessionID();
+      return Indigo.checkResultString(this, _lib.indigoJson(self));
+   }
+
    public void saveCml (String filename)
    {
       dispatcher.setSessionID();
@@ -460,6 +466,21 @@ public class IndigoObject implements Iterator<IndigoObject>, Iterable<IndigoObje
    {
       dispatcher.setSessionID();
       return Indigo.checkResult(this, _lib.indigoCheckStereo(self));
+   }
+
+   public String check()
+   {
+      String type = "";
+      dispatcher.setSessionID();
+      return Indigo.checkResultString(this, _lib.indigoCheck(self, type));
+   }
+
+   public String check(String type)
+   {
+      if (type == null)
+         type = "";
+      dispatcher.setSessionID();
+      return Indigo.checkResultString(this, _lib.indigoCheck(self, type));
    }
 
    public Integer countHydrogens ()

@@ -205,6 +205,8 @@ CEXPORT const char * indigoCdxml (int object);
 // (because MDLCT data usually contains zeroes)
 CEXPORT int indigoSaveMDLCT (int item, int output);
 
+CEXPORT const char * indigoJson (int object);
+
 /*
 Converts a chemical name into a corresponding structure
 Returns -1 if parsing fails or no structure is found
@@ -406,6 +408,12 @@ CEXPORT int indigoCheckQuery (int item);
 
 // Returns one if structure contains RGroup features (RSites, RGroups or attachment points
 CEXPORT int indigoCheckRGroups (int item);
+
+// Returns check result for Indigo object for requested properties
+CEXPORT const char * indigoCheck (int item, const char *props);
+
+// Returns check result for structure against requested properties
+CEXPORT const char * indigoCheckStructure (const char *structure, const char *props);
 
 // Applicable to atoms, query atoms, and molecules. Can fail
 // (return zero) on query atoms where the number of hydrogens

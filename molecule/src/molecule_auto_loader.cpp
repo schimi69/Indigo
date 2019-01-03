@@ -28,6 +28,7 @@
 #include "molecule/inchi_wrapper.h"
 #include "base_cpp/output.h"
 #include "molecule/molecule_name_parser.h"
+#include "molecule/molecule_json_loader.h"
 
 using namespace indigo;
 
@@ -41,6 +42,7 @@ void MoleculeAutoLoader::_init ()
    ignore_cistrans_errors = false;
    ignore_no_chiral_flag = false;
    ignore_bad_valence = false;
+   treat_stereo_as = 0;
 }
 
 IMPL_ERROR(MoleculeAutoLoader, "molecule auto loader");
@@ -186,7 +188,7 @@ void MoleculeAutoLoader::_loadMolecule (BaseMolecule &mol, bool query)
    properties.clear();
 
    // check for GZip format
-   if (!query && _scanner->length() >= 2LL)
+   if (_scanner->length() >= 2LL)
    {
       byte id[2];
       long long pos = _scanner->tell();
@@ -207,7 +209,13 @@ void MoleculeAutoLoader::_loadMolecule (BaseMolecule &mol, bool query)
          loader2.treat_x_as_pseudoatom = treat_x_as_pseudoatom;
          loader2.skip_3d_chirality = skip_3d_chirality;
          loader2.ignore_no_chiral_flag = ignore_no_chiral_flag;
-         loader2.loadMolecule((Molecule &)mol);
+         loader2.treat_stereo_as = treat_stereo_as;
+
+         if (query)
+            loader2.loadQueryMolecule((QueryMolecule &)mol);
+         else
+            loader2.loadMolecule((Molecule &)mol);
+
          return;
       }
    }
@@ -224,6 +232,7 @@ void MoleculeAutoLoader::_loadMolecule (BaseMolecule &mol, bool query)
          loader.skip_3d_chirality = skip_3d_chirality;
          loader.treat_x_as_pseudoatom = treat_x_as_pseudoatom;
          loader.ignore_no_chiral_flag = ignore_no_chiral_flag;
+         loader.treat_stereo_as = treat_stereo_as;
 
          if (query)
             loader.loadQueryMolecule((QueryMolecule &)mol);
@@ -273,6 +282,31 @@ void MoleculeAutoLoader::_loadMolecule (BaseMolecule &mol, bool query)
 
       _scanner->seek(pos, SEEK_SET);
    }
+
+   // check json format
+   {
+      long long pos = _scanner->tell();
+      _scanner->skipSpace();
+
+      if (_scanner->lookNext() == '{')
+      {
+         if (_scanner->findWord("molecule"))
+         {
+            _scanner->seek(pos, SEEK_SET);
+            try {
+               MoleculeJsonLoader loader(*_scanner);
+               if (query)
+                  loader.loadQueryMolecule((QueryMolecule &)mol);
+               else
+                  loader.loadMolecule((Molecule &)mol);
+               return;
+            } catch (...) {
+            }
+         }
+      }
+      _scanner->seek(pos, SEEK_SET);
+   }
+
 
    // check for single line formats
    if (Scanner::isSingleLine(*_scanner)) {
@@ -330,6 +364,7 @@ void MoleculeAutoLoader::_loadMolecule (BaseMolecule &mol, bool query)
          err_buf.appendString(e.message(), true);
       }
 
+
       // We fall down to IUPAC name conversion if SMILES loading threw an exception
       try {
          Array<char> name;
@@ -338,7 +373,7 @@ void MoleculeAutoLoader::_loadMolecule (BaseMolecule &mol, bool query)
          MoleculeNameParser parser;
          parser.parseMolecule(name.ptr(), static_cast<Molecule&>(mol));
          return;
-      } catch (Exception&) {
+      } catch (...) {
       }
 
       if (err_buf.size() > 0) {
@@ -379,6 +414,8 @@ void MoleculeAutoLoader::_loadMolecule (BaseMolecule &mol, bool query)
       loader.skip_3d_chirality = skip_3d_chirality;
       loader.treat_x_as_pseudoatom = treat_x_as_pseudoatom;
       loader.ignore_no_chiral_flag = ignore_no_chiral_flag;
+      loader.treat_stereo_as = treat_stereo_as;
+
 
       if (query)
          loader.loadQueryMolecule((QueryMolecule &)mol);
